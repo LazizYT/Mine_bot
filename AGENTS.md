@@ -72,9 +72,10 @@ opencode сразу знал контекст.
 - Статус: RUNNING, restarts 0. В логах только warning про CurseForge, бот + Flask (порт 8080) поднялись.
 - Значения для env взяты из локального `.env` (в нём теперь есть TELEGRAM_TOKEN, GROQ_API_KEY, GEMINI_KEY, CHANNELS=@lazikosmods).
 
-### Деплой через git (не тестировался с новой конфигурацией)
-- Git remote: `https://Bc2g6:d7A9Xxs6H@justrunmy.app/git/r_e2R5D` (branch `deploy`), командой `git push -u <remote> HEAD:deploy`.
+### Деплой через git (проверено 2026-08-10)
+- Git remote: `https://Bc2g6:d7A9Xxs6H@justrunmy.app/git/r_e2R5D` (branch `deploy`), командой `git push justrunmy HEAD:deploy`.
 - Пуш автоматически пересобирает Docker-образ и рестартит приложение. Volume `/app/data` переживёт редеплой.
+- После деплоя проверено: root 200, `/api/stats` 200, `/api/analytics` 200, `/logo.png` 200, `/api/curseforge/*` → 404 (удалён), очередь/график рендерятся, в логах нет warning'ов про CurseForge/Groq.
 
 ## Правило работы
 
