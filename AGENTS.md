@@ -60,6 +60,12 @@ opencode сразу знал контекст.
    - **Фича 3 — аналитика публикаций**: `database.get_post_stats()`, роут `/api/analytics`, карточки TOTAL/TODAY/WEEK/MONTH + график PUBLISHED_PER_DAY (bar chart).
    - **Фича 5 — мониторинг оттока**: `publisher.check_subscriber_drop()` каждые 6ч сравнивает подписчиков и шлёт админу алерт при оттоке.
    - Мёртвый код удалён: `main_new.py`, `reorder_logic.py`, `playwright` и `google-genai` из requirements, `import utils` в handlers.
+6. **ПАМЯТЬ ИИ (2026-08-10)**: таблица `ai_memory` (ручные заметки админа, хранятся в БД на volume). Функции `add_memory_note`/`get_memory_notes`/`delete_memory_note`/`clear_memory_notes`. Заметки автоматически подставляются в контекст всех генераций ИИ: `generate_post`, `translate_post`, `rewrite_post`, `generate_reply`, `generate_suggestion_request`, `improve_prompt`, `comments_analyzer.analyze_comments` (через `ai_generator.get_memory_context(limit=10)`). Панель: вкладка «Память» (Xotira/Memory) — CRUD через `/api/memory` (GET/POST), `/api/memory/<id>` (DELETE), `/api/memory/clear` (POST).
+7. **БАГ-ФИКСЫ ПАНЕЛИ (2026-08-10)**:
+   - Кнопка «studio» (Web App из BotFather) открывала `/studio` → 404. Добавлены алиасы роутов `@app.route('/studio')` и `@app.route('/app')` (тот же дашборд, что `/`).
+   - Фото постов не отображались: в карточках очереди/истории не было `<img>`. Добавлены превью (`/file/<file_id>`). Роут `/file/<file_id>` переделан с redirect (токен в URL, в WebApp не грузился) на прокси через `bot.download_file` — отдаёт image/jpeg напрямую, без утечки токена.
+   - Кнопка EDIT не работала: `onclick="editPost({{ item|tojson }})"` — кавычки JSON ломали HTML-атрибут. Теперь `editPost(id)` грузит пост через новый роут `/api/post/<id>` (JSON). Аналогично VIEW (`viewFullText(id)`).
+   - Роут `api_clear_ai_memory` переименован (конфликт имени endpoint со старым `/api/system/clear-memory`).
 
 ## ВЫПОЛНЕНО: настройка приложения в панели justrunmy.app (id 53038, имя MineBot_cli)
 
