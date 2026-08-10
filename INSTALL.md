@@ -13,9 +13,13 @@
 ## Установка
 1. Установите Python 3.10+.
 2. Создайте файл `.env` в корневой папке и добавьте необходимые ключи:
-   - `BOT_TOKEN`: Токен вашего бота.
+   - `TELEGRAM_TOKEN`: Токен вашего бота.
    - `GROQ_API_KEY`: API ключ Groq.
-   - `ADMIN_IDS`: ID администраторов через запятую.
+   - `GEMINI_KEY`: API ключ Google Gemini (необязательно).
+   - `CURSEFORGE_API_KEY`: API ключ CurseForge (необязательно, для поиска модов).
+   - `CHANNELS`: Список каналов через запятую (например `@mychannel,@channel2`).
+   - `DB_PATH`: Путь к файлу БД SQLite (необязательно; по умолчанию `data/bot_data.db`).
+   ID администраторов задаются в `config.py` в переменной `ADMIN_IDS`.
 3. Установите зависимости:
    `pip install -r requirements.txt`
 4. Запустите:

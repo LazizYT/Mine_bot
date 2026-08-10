@@ -3,14 +3,17 @@ import time
 import os
 from datetime import datetime
 
-# Путь к файлу базы данных SQLite. 
-# Используется папка 'data/', которая обычно мапится на Railway Volume для сохранения данных при перезагрузках.
-DB_PATH = '/app/data/bot_data.db'
+# Путь к файлу базы данных SQLite.
+# По умолчанию 'data/bot_data.db' (относительно рабочей папки).
+# На Railway/Docker можно переопределить через env DB_PATH (например /app/data/bot_data.db),
+# чтобы данные сохранялись на Volume при перезагрузках.
+DB_PATH = os.getenv('DB_PATH', os.path.join('data', 'bot_data.db'))
 
 def init_db():
     """Инициализация структуры базы данных при запуске приложения."""
-    if not os.path.exists('data'):
-        os.makedirs('data')
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir)
         
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -379,6 +382,15 @@ def get_pending_posts():
     rows = c.fetchall()
     conn.close()
     return rows
+
+def get_last_scheduled_time():
+    """Возвращает максимальное scheduled_time среди ожидающих постов (или None, если очередь пуста)."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT MAX(scheduled_time) FROM queue WHERE status='pending'")
+    res = c.fetchone()
+    conn.close()
+    return res[0] if res else None
 
 def update_post_times(updates):
     conn = sqlite3.connect(DB_PATH)
