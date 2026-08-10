@@ -1,5 +1,6 @@
 import config
 import database
+import ai_generator
 from groq import Groq
 
 MODEL_ID = "llama-3.3-70b-versatile"
@@ -33,6 +34,7 @@ def analyze_comments():
     # Инструкция для ИИ
     prompt = f"""
     Ты — аналитик Telegram-канала о модах Minecraft.
+    {ai_generator.get_memory_context()}
     Ниже приведены сообщения из чата. 
     ВАЖНО: В списке могут быть как комментарии пользователей, так и описания модов от самого канала.
     Твоя задача: 

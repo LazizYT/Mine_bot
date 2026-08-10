@@ -95,6 +95,8 @@ def set_ui_lang():
     return resp
 
 @app.route('/')
+@app.route('/studio')
+@app.route('/app')
 def index():
     collect_stats()
     

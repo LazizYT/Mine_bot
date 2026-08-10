@@ -71,6 +71,10 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS ai_prompts
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, prompt TEXT, is_active INTEGER DEFAULT 0)''')
 
+    # Память ИИ: ручные заметки админа, всегда подаются в контекст генерации
+    c.execute('''CREATE TABLE IF NOT EXISTS ai_memory
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, note TEXT, created_at INTEGER)''')
+
     conn.commit()
     conn.close()
     
@@ -495,5 +499,35 @@ def get_post_stats():
     conn.close()
     return {'total': total, 'today': today, 'week': week, 'month': month,
             'labels': labels, 'data': data}
+
+# --- Память ИИ (ручные заметки админа) ---
+def add_memory_note(note):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO ai_memory (note, created_at) VALUES (?, ?)", (note, int(time.time())))
+    conn.commit()
+    conn.close()
+
+def get_memory_notes():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, note, created_at FROM ai_memory ORDER BY created_at DESC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def delete_memory_note(note_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM ai_memory WHERE id = ?", (note_id,))
+    conn.commit()
+    conn.close()
+
+def clear_memory_notes():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM ai_memory")
+    conn.commit()
+    conn.close()
 
 init_db()

@@ -76,6 +76,20 @@ Qo‘shimcha:
 # Используемая модель ИИ
 MODEL_ID = "llama-3.3-70b-versatile"
 
+def get_memory_context(limit=10):
+    """
+    Собирает ручные заметки админа из таблицы ai_memory (память ИИ).
+    Возвращает пустую строку, если заметок нет, чтобы не менять поведение.
+    """
+    try:
+        notes = database.get_memory_notes()
+    except Exception:
+        return ""
+    if not notes:
+        return ""
+    lines = [f"- {n[1]}" for n in notes[:limit]]
+    return "ADMIN MEMORY (important notes from the channel admin, always respect them):\n" + "\n".join(lines) + "\n\n"
+
 def extract_url(text):
     """Извлекает первую найденную URL-ссылку из текста."""
     urls = re.findall(r'(https?://[^\s]+)', text)
@@ -162,7 +176,8 @@ def generate_post(user_input, persona="uz"):
     target_lang = lang_map.get(persona, "O'zbek tilida")
 
     # Формируем полный промпт
-    prompt = f"TASK: Write a Minecraft mod post strictly {target_lang}.\n\n{effective_prompt_template}\n\nDATA TO PROCESS:\n{user_input}\n{mod_metadata}\n{site_content}\n\nREMINDER: Use the VERIFIED MOD DATA if available. The entire post must be {target_lang}."
+    memory = get_memory_context()
+    prompt = f"TASK: Write a Minecraft mod post strictly {target_lang}.\n\n{memory}{effective_prompt_template}\n\nDATA TO PROCESS:\n{user_input}\n{mod_metadata}\n{site_content}\n\nREMINDER: Use the VERIFIED MOD DATA if available. The entire post must be {target_lang}."
     
     if not config.GROQ_API_KEY:
         print("⚠️ generate_post: GROQ_API_KEY not set.")
@@ -219,7 +234,7 @@ def translate_post(text, target_persona="uz"):
         }
         target_lang = lang_map.get(target_persona, "English")
         
-        prompt = f"Translate this Telegram post strictly to {target_lang}. Keep all HTML tags like <b>, <blockquote>, <blockquote expandable> exactly as they are. Do not remove any emojis. Text to translate:\n\n{text}"
+        prompt = f"Translate this Telegram post strictly to {target_lang}. Keep all HTML tags like <b>, <blockquote>, <blockquote expandable> exactly as they are. Do not remove any emojis.\n\n{get_memory_context()}\nText to translate:\n\n{text}"
         
         res = _get_client().chat.completions.create(
             messages=[{"role": "user", "content": prompt}], 
@@ -248,6 +263,7 @@ def generate_reply(comment_text, persona="uz"):
 
         prompt = f"""
         {selected_personality}
+        {get_memory_context()}
         Foydalanuvchi yozdi: "{comment_text}"
 
         Vazifa: Ushbu xabarga {target_lang} qisqa (1 ta gap) javob ber. 
@@ -273,6 +289,7 @@ def generate_suggestion_request(persona="uz"):
         target_lang = lang_map.get(persona, "O'zbek tilida")
 
         prompt = f"""
+        {get_memory_context()}
         Minecraft kanali uchun qisqa va qiziqarli post yoz. 
         Maqsad: Obunachilardan qanday modlar, karta yoki teksturalar ko'rishni xohlashlarini so'rash.
         Stil: Do'stona, emojilarga boy.
@@ -309,6 +326,7 @@ Rewrite the Telegram post below {target_lang}.
 Style: {style_map.get(style, style_map['short'])}.
 Keep all HTML tags (<b>, <blockquote>, <blockquote expandable>) and emojis.
 Keep the same hashtags structure. Do not add a signature.
+{get_memory_context()}
 Post:
 {text}
 """
