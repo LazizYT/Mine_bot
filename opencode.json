@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "justrunmy": {
+      "type": "remote",
+      "url": "https://justrunmy.app/api/mcp",
+      "headers": {
+        "X-User-Identity": "{file:.opencode/jrnm_identity.txt}"
+      }
+    }
+  }
+}
