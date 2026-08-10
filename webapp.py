@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, send_file, Response
+from flask import Flask, render_template, request, jsonify, send_file, Response
 import database
 import config
 import os
@@ -325,6 +325,29 @@ def api_upload_logo():
 def api_analytics():
     return jsonify(database.get_post_stats())
 
+@app.route('/api/memory', methods=['GET'])
+def api_get_memory():
+    notes = database.get_memory_notes()
+    return jsonify([{'id': n[0], 'note': n[1], 'created_at': n[2]} for n in notes])
+
+@app.route('/api/memory', methods=['POST'])
+def api_add_memory():
+    note = (request.json or {}).get('note', '').strip()
+    if not note:
+        return jsonify({'error': 'Empty note'}), 400
+    database.add_memory_note(note)
+    return jsonify({'status': 'success'})
+
+@app.route('/api/memory/<int:note_id>', methods=['DELETE'])
+def api_delete_memory(note_id):
+    database.delete_memory_note(note_id)
+    return jsonify({'status': 'success'})
+
+@app.route('/api/memory/clear', methods=['POST'])
+def api_clear_ai_memory():
+    database.clear_memory_notes()
+    return jsonify({'status': 'success'})
+
 @app.route('/logo.png')
 def get_logo():
     path = os.path.join('templates', 'logo.png')
@@ -363,14 +386,39 @@ def api_remove_channel():
 
 @app.route('/file/<path:file_id>')
 def serve_file(file_id):
+    # Локальные файлы (водяные знаки, логотип)
     if not file_id.startswith('AgAC') and not file_id.startswith('file_') and ('.' in file_id or '/' in file_id or '\\' in file_id):
         for folder in ['data', 'templates']:
             path = os.path.join(folder, os.path.basename(file_id))
             if os.path.exists(path):
                 return send_file(path)
-    
-    url = get_telegram_file_url(file_id)
-    return redirect(url) if url else ("/static/no-image.png", 404)
+    # Telegram file_id — проксируем через бота (без утечки токена в URL, работает в WebApp)
+    try:
+        from io import BytesIO
+        file_info = bot.get_file(file_id)
+        data = bot.download_file(file_info.file_path)
+        ext = os.path.splitext(file_info.file_path or '')[1] or '.jpg'
+        mime = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                'webp': 'image/webp', 'gif': 'image/gif'}.get(ext.lstrip('.').lower(), 'image/jpeg')
+        return send_file(BytesIO(data), mimetype=mime, download_name=f"file_{file_id}{ext}")
+    except Exception as e:
+        print(f"❌ Ошибка загрузки файла {file_id}: {e}")
+        return "Not found", 404
+
+@app.route('/api/post/<int:post_id>')
+def api_get_post(post_id):
+    post = database.get_post_by_id(post_id)
+    if not post:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify({
+        'id': post[0],
+        'photos': post[1].split(',') if post[1] else [],
+        'text': post[2],
+        'document_id': post[3],
+        'channel': post[4] or config.DEFAULT_CHANNEL,
+        'timestamp': post[5],
+        'iso_time': datetime.fromtimestamp(post[5]).strftime('%Y-%m-%dT%H:%M') if post[5] else ""
+    })
 
 @app.route('/api/delete-file/<int:post_id>/<int:file_idx>', methods=['POST'])
 def delete_file(post_id, file_idx):
