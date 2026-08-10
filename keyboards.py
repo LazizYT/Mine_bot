@@ -16,6 +16,12 @@ def get_cancel_markup(lang='uz'):
     markup.add(KeyboardButton(btns['cancel']))
     return markup
 
+def get_resume_markup(lang='uz'):
+    btns = strings.BUTTONS.get(lang, strings.BUTTONS['uz'])
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.add(InlineKeyboardButton("↩️ " + btns.get('resume_draft', 'Resume draft'), callback_data="resume_draft"))
+    return markup
+
 def get_channel_select_menu(target_id, channels, action_type="pub"):
     """
     Клавиатура для выбора канала.

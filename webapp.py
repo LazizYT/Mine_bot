@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, send_file
+from flask import Flask, render_template, request, jsonify, redirect, send_file, Response
 import database
 import config
 import os
@@ -8,11 +8,43 @@ import pytz
 import telebot
 import publisher
 import comments_analyzer
+import ai_generator
 from bot_instance import bot
 
 app = Flask(__name__)
 
+# Опциональная защита панели базовой авторизацией.
+# Включается только если задан PANEL_PASSWORD в env. Иначе панель открыта (текущее поведение).
+def _panel_auth_enabled():
+    return bool(config.PANEL_PASSWORD)
+
+@app.before_request
+def _require_auth():
+    if not _panel_auth_enabled():
+        return None
+    auth = request.authorization
+    if auth and auth.username == config.PANEL_USER and auth.password == config.PANEL_PASSWORD:
+        return None
+    return Response('Authentication required', 401, {'WWW-Authenticate': 'Basic realm="MINE_BOT_OS"'})
+
 file_path_cache = {}
+# Кеш статистики подписчиков (не дёргать Telegram API на каждый запрос страницы)
+_stats_cache = {'ts': 0, 'data': None}
+_STATS_CACHE_TTL = 600  # 10 минут
+
+def collect_stats():
+    global _stats_cache
+    now = time.time()
+    if _stats_cache['data'] is not None and now - _stats_cache['ts'] < _STATS_CACHE_TTL:
+        return _stats_cache['data']
+    channels = database.get_all_managed_channels()
+    for ch in channels:
+        try:
+            count = bot.get_chat_member_count(ch)
+            database.save_sub_count(ch, count)
+        except: pass
+    _stats_cache = {'ts': now, 'data': True}
+    return True
 
 def get_telegram_file_url(file_id):
     if file_id in file_path_cache: return file_path_cache[file_id]
@@ -54,39 +86,6 @@ def get_channel_growth(channel_id):
         '30d': get_diff(30),
         'current': current
     }
-
-import mod_parser
-import ai_generator
-
-@app.route('/api/curseforge/search')
-def api_curseforge_search():
-    query = request.args.get('q', '')
-    if not query: return jsonify([])
-    results = mod_parser.search_curseforge(query)
-    return jsonify(results)
-
-@app.route('/api/curseforge/create-post', methods=['POST'])
-def api_curseforge_create_post():
-    data = request.json
-    mod_id = data.get('mod_id')
-    scheduled_time = data.get('time') # timestamp
-    
-    mod_data = mod_parser.get_curseforge_mod_by_id(mod_id)
-    if not mod_data: return jsonify({'error': 'Mod not found'}), 404
-    
-    # Генерация текста через ИИ
-    ui_lang = request.cookies.get('ui_lang', 'uz')
-    generated_text = ai_generator.generate_post(mod_data['url'], ui_lang)
-    
-    # Добавление в очередь
-    database.add_to_queue(
-        photo_id=mod_data.get('logo'), # Используем лого как фото
-        text=generated_text,
-        document_id=None,
-        channel_id=config.DEFAULT_CHANNEL,
-        scheduled_time=scheduled_time
-    )
-    return jsonify({'status': 'success'})
 
 @app.route('/api/ui-lang', methods=['POST'])
 def set_ui_lang():
@@ -161,6 +160,8 @@ def index():
     import json
     with open('translations.json', 'r', encoding='utf-8') as f:
         translations = json.load(f)
+
+    post_stats = database.get_post_stats()
     
     return render_template('dashboard.html', stats=stats, queue=queue, 
                            history=history,
@@ -169,6 +170,7 @@ def index():
                            sq_interval=sq_interval, sq_text=sq_text,
                            watermarks=watermarks, active_prompt=active_prompt,
                            active_prompt_id=active_prompt_id,
+                           post_stats=post_stats,
                            translations=translations,
                            config=config)
 
@@ -267,6 +269,59 @@ def set_language():
             database.update_user_setting(admin_id, 'persona', lang)
         return jsonify({'status': 'success'})
     return jsonify({'status': 'error'}), 400
+
+@app.route('/api/delete/<int:post_id>', methods=['POST'])
+def api_delete_post(post_id):
+    database.delete_from_queue(post_id)
+    return jsonify({'status': 'success'})
+
+@app.route('/api/prompts/improve', methods=['POST'])
+def api_improve_prompt():
+    desc = request.json.get('desc', '')
+    if not desc: return jsonify({'error': 'Empty description'}), 400
+    return jsonify({'improved': ai_generator.improve_prompt(desc)})
+
+@app.route('/api/prompts/select', methods=['POST'])
+def api_select_prompt():
+    prompt_id = request.json.get('id')
+    if prompt_id:
+        database.activate_prompt(prompt_id)
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error'}), 400
+
+@app.route('/api/settings/interval', methods=['POST'])
+def api_set_interval():
+    interval = request.json.get('interval', '6')
+    database.set_global_setting('smart_queue_interval', str(interval))
+    return jsonify({'status': 'success'})
+
+@app.route('/api/system/clear-memory', methods=['POST'])
+def api_clear_memory():
+    database.clear_comments()
+    return jsonify({'status': 'success'})
+
+@app.route('/api/upload/logo', methods=['POST'])
+def api_upload_logo():
+    if 'file' not in request.files: return jsonify({'error': 'No file'}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({'error': 'No file'}), 400
+    filename = f"wm_{int(time.time())}.png"
+    path = os.path.join('data', filename)
+    file.save(path)
+    if database.add_watermark_db(path, file.filename):
+        # Автоматически активируем новый логотип
+        wms = database.get_all_watermarks()
+        for wm in wms:
+            if wm[1] == path:
+                database.set_active_watermark(wm[0])
+                break
+        return jsonify({'status': 'success'})
+    os.remove(path)
+    return jsonify({'error': 'Limit reached (max 5)'}), 400
+
+@app.route('/api/analytics')
+def api_analytics():
+    return jsonify(database.get_post_stats())
 
 @app.route('/logo.png')
 def get_logo():

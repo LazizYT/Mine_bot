@@ -104,3 +104,39 @@ def process_queue(bot):
         post_id, photo_id, text, document_id, channel_id = post
         target_channel = channel_id if channel_id else config.DEFAULT_CHANNEL
         publish_post_data(bot, post_id, photo_id, text, document_id, target_channel, is_auto=True)
+
+def check_subscriber_drop(bot):
+    """Каждые несколько часов сравнивает число подписчиков с прошлым срезом и уведомляет админа о падении."""
+    try:
+        channels = database.get_all_managed_channels()
+        for ch in channels:
+            try:
+                current = bot.get_chat_member_count(ch)
+            except Exception as e:
+                print(f"⚠️ Не удалось получить число подписчиков {ch}: {e}")
+                continue
+
+            history = database.get_sub_history(ch)
+            # history: список (date, count) по возрастанию дат
+            prev = history[-2][1] if len(history) >= 2 else None
+
+            # Сохраняем текущий срез
+            database.save_sub_count(ch, current)
+
+            if prev is not None and current < prev:
+                drop = prev - current
+                for admin in getattr(config, 'ADMIN_IDS', []):
+                    try:
+                        bot.send_message(
+                            admin,
+                            f"⚠️ <b>Падение подписчиков:</b>\n"
+                            f"Канал: {ch}\n"
+                            f"Было: {prev}\n"
+                            f"Стало: {current}\n"
+                            f"Отток: -{drop}",
+                            parse_mode='HTML'
+                        )
+                    except: pass
+                print(f"📉 Отток подписчиков в {ch}: -{drop}")
+    except Exception as e:
+        print(f"❌ Ошибка проверки подписчиков: {e}")

@@ -12,7 +12,6 @@ import config
 import database
 import ai_generator
 import watermarker
-import utils
 import keyboards
 import publisher
 import strings
@@ -131,7 +130,12 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             return
 
         if message.text == btns['create']:
-            bot.send_message(message.chat.id, get_txt(user_id, 'choose_action'), reply_markup=keyboards.get_cancel_markup(lang))
+            saved = database.get_user_draft(user_id)
+            if saved:
+                markup = keyboards.get_resume_markup(lang)
+            else:
+                markup = keyboards.get_cancel_markup(lang)
+            bot.send_message(message.chat.id, get_txt(user_id, 'choose_action'), reply_markup=markup)
             return
         if message.text == btns['lang']:
             bot.send_message(message.chat.id, get_txt(user_id, 'choose_lang'), reply_markup=keyboards.get_language_menu())
@@ -158,8 +162,11 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         status_msg = bot.send_message(message.chat.id, get_txt(user_id, 'generation_start'), parse_mode='HTML')
         try:
             bot.send_chat_action(message.chat.id, 'upload_photo')
-            user_input = message.caption if message.photo else message.text
+            user_input = message.caption or message.text or "Minecraft mod photo"
             generated_text = ai_generator.generate_post(user_input, lang)
+            if not generated_text:
+                bot.edit_message_text("❌ Ошибка ИИ при генерации поста. Попробуйте ещё раз.", message.chat.id, status_msg.message_id)
+                return
             photo_id = None
             if message.photo:
                 bot.edit_message_text(get_txt(user_id, 'processing_photo'), message.chat.id, status_msg.message_id, parse_mode='HTML')
@@ -195,6 +202,7 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         
         user_drafts[sent.message_id] = draft
         user_current_draft_id[user_id] = sent.message_id
+        database.save_draft(user_id, draft.get('photo'), draft.get('text'), draft.get('document'), draft.get('channel', config.DEFAULT_CHANNEL))
         bot.edit_message_reply_markup(chat_id, sent.message_id, reply_markup=keyboards.get_draft_markup(sent.message_id, lang))
 
     @bot.message_handler(content_types=['document'])
@@ -220,9 +228,10 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             return
 
         if call.data == "cancel_action":
-            # Удаляем черновик из словаря
+            # Удаляем черновик из словаря и из БД
             if target_id in user_drafts:
                 del user_drafts[target_id]
+            database.delete_draft(user_id)
             
             # Удаляем сообщение с черновиком
             try:
@@ -232,6 +241,15 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             
             # Отправляем главное меню
             bot.send_message(chat_id, get_txt(user_id, 'cancel_msg'), reply_markup=keyboards.get_main_menu(lang))
+            return
+
+        if call.data == "resume_draft":
+            saved = database.get_user_draft(user_id)
+            if saved:
+                send_draft_preview(chat_id, user_id, saved)
+                bot.delete_message(chat_id, target_id)
+            else:
+                bot.answer_callback_query(call.id, get_txt(user_id, 'no_draft'))
             return
 
         # Навигация
@@ -277,12 +295,13 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             return
 
         if call.data.startswith("sel_"):
-            parts = call.data.split('_')
+            parts = call.data.split('_', 2)  # split('_', 2): channel может содержать '_'
             action = parts[1]
             channel = parts[2]
             
             if action == "pub":
                 publisher.publish_post_data(bot, -1, draft['photo'], draft['text'], draft['document'], channel)
+                database.delete_draft(user_id)
                 bot.delete_message(chat_id, target_id)
                 bot.send_message(chat_id, get_txt(user_id, 'published'), reply_markup=keyboards.get_main_menu(lang))
             
@@ -291,12 +310,14 @@ def register_handlers(bot_instance, user_drafts, album_cache):
                 last_time = database.get_last_scheduled_time() or int(time.time())
                 sched_time = max(int(time.time()), last_time) + interval * 3600
                 database.add_to_queue(draft['photo'], draft['text'], draft['document'], channel, sched_time)
+                database.delete_draft(user_id)
                 bot.delete_message(chat_id, target_id)
                 bot.send_message(chat_id, get_txt(user_id, 'smart_queue_added'), reply_markup=keyboards.get_main_menu(lang))
 
             elif action.startswith("sched"):
                 h = int(action.replace("sched", ""))
                 database.add_to_queue(draft['photo'], draft['text'], draft['document'], channel, int(time.time()) + h*3600)
+                database.delete_draft(user_id)
                 bot.delete_message(chat_id, target_id)
                 bot.send_message(chat_id, get_txt(user_id, 'scheduled', time=f"+{h}h"), reply_markup=keyboards.get_main_menu(lang))
             return
@@ -307,7 +328,11 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         elif call.data.startswith("tr_"):
             t_lang = call.data.split('_')[1]
             bot.answer_callback_query(call.id, get_txt(user_id, 'translating'))
-            draft['text'] = ai_generator.translate_post(draft['text'], t_lang)
+            new_text = ai_generator.translate_post(draft['text'], t_lang)
+            if not new_text:
+                bot.answer_callback_query(call.id, "❌ Ошибка перевода", show_alert=True)
+                return
+            draft['text'] = new_text
             send_draft_preview(chat_id, user_id, draft)
             bot.delete_message(chat_id, target_id)
         elif call.data == "edit_text":
@@ -318,7 +343,11 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         elif call.data.startswith("rewrite_"):
             style = call.data.split('_')[1]
             bot.answer_callback_query(call.id, get_txt(user_id, 'rewriting'))
-            draft['text'] = ai_generator.rewrite_post(draft['text'], style, lang)
+            new_text = ai_generator.rewrite_post(draft['text'], style, lang)
+            if not new_text:
+                bot.answer_callback_query(call.id, "❌ Ошибка рерайта", show_alert=True)
+                return
+            draft['text'] = new_text
             send_draft_preview(chat_id, user_id, draft)
             bot.delete_message(chat_id, target_id)
 
@@ -327,15 +356,22 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         msgs = album_cache.get(media_group_id)
         if not msgs: return
         status = bot.send_message(chat_id, get_txt(user_id, 'album_loading'))
+        temp_files = []
         try:
             txt = ai_generator.generate_post(next((m.caption for m in msgs if m.caption), "Album"), lang)
+            if not txt:
+                bot.edit_message_text("❌ Ошибка ИИ при генерации поста.", chat_id, status.message_id)
+                return
             p_ids = []
             for i, m in enumerate(msgs):
                 bot.edit_message_text(get_txt(user_id, 'album_processing', i=i+1, total=len(msgs)), chat_id, status.message_id)
                 f_info = bot.get_file(m.photo[-1].file_id)
-                with open("temp.jpg", 'wb') as f: f.write(bot.download_file(f_info.file_path))
-                watermarker.add_watermark("temp.jpg", "out.jpg")
-                with open("out.jpg", 'rb') as f:
+                temp_in = f"temp_{media_group_id}_{i}.jpg"
+                temp_out = f"out_{media_group_id}_{i}.jpg"
+                temp_files += [temp_in, temp_out]
+                with open(temp_in, 'wb') as f: f.write(bot.download_file(f_info.file_path))
+                watermarker.add_watermark(temp_in, temp_out)
+                with open(temp_out, 'rb') as f:
                     s = bot.send_photo(config.LOG_CHANNEL if hasattr(config, 'LOG_CHANNEL') else chat_id, f)
                     p_ids.append(s.photo[-1].file_id)
                     if not hasattr(config, 'LOG_CHANNEL'): bot.delete_message(chat_id, s.message_id)
@@ -343,4 +379,6 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             send_draft_preview(chat_id, user_id, {'photo': ",".join(p_ids), 'text': txt, 'document': None})
         except Exception as e: bot.edit_message_text(f"❌ Error: {e}", chat_id, status.message_id)
         finally:
+            for f in temp_files:
+                if os.path.exists(f): os.remove(f)
             if media_group_id in album_cache: del album_cache[media_group_id]

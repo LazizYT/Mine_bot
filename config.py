@@ -8,9 +8,6 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-CURSEFORGE_API_KEY = os.getenv("CURSEFORGE_API_KEY")
-BROWSER_ACT_API_KEY = os.getenv("BROWSER_ACT_API_KEY", "app-SrnMNQHJzuKityGrZ0q8yMve")
-
 
 if not TELEGRAM_TOKEN:
     raise ValueError("❌ КРИТИЧЕСКАЯ ОШИБКА: TELEGRAM_TOKEN не установлен!")
@@ -18,14 +15,15 @@ if not GROQ_API_KEY:
     print("⚠️ WARNING: GROQ_API_KEY is not set. AI functions might fail.")
 if not GEMINI_KEY:
     print("⚠️ WARNING: GEMINI_KEY is not set.")
-if not CURSEFORGE_API_KEY:
-    print("⚠️ WARNING: CURSEFORGE_API_KEY is not set. CurseForge integration will not work.")
 
-CHANNELS_STR = os.getenv("CHANNELS", "@lazikomods")
+CHANNELS_STR = os.getenv("CHANNELS", "@lazikosmods")
 AVAILABLE_CHANNELS = [ch.strip() for ch in CHANNELS_STR.split(',')]
 DEFAULT_CHANNEL = AVAILABLE_CHANNELS[0] if AVAILABLE_CHANNELS else ""
 
-WATERMARK_TEXT = "@lazikomods"
+WATERMARK_TEXT = os.getenv("WATERMARK_TEXT", "@lazikosmods")
+
+PANEL_USER = os.getenv("PANEL_USER", "admin")
+PANEL_PASSWORD = os.getenv("PANEL_PASSWORD", "")
 
 # 🧠 НОВАЯ НАСТРОЙКА: Интервал умной очереди (в часах)
 SMART_QUEUE_INTERVAL_HOURS = 6

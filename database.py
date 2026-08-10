@@ -1,7 +1,7 @@
 import sqlite3
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Путь к файлу базы данных SQLite.
 # По умолчанию 'data/bot_data.db' (относительно рабочей папки).
@@ -42,6 +42,10 @@ def init_db():
     # Таблица комментариев пользователей (для анализа через Groq)
     c.execute('''CREATE TABLE IF NOT EXISTS comments
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT, text TEXT, timestamp INTEGER)''')
+
+    # Черновики постов на пользователя (переживают рестарт бота)
+    c.execute('''CREATE TABLE IF NOT EXISTS drafts
+                 (user_id INTEGER PRIMARY KEY, photo TEXT, text TEXT, document TEXT, channel TEXT, updated INTEGER)''')
 
     # Таблица списка каналов, которыми управляет бот
     c.execute('''CREATE TABLE IF NOT EXISTS managed_channels
@@ -417,10 +421,10 @@ def save_comment(user_name, text, timestamp):
     conn.commit()
     conn.close()
 
-def get_all_comments():
+def get_all_comments(limit=200):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT user_name, text FROM comments ORDER BY timestamp ASC")
+    c.execute("SELECT user_name, text FROM comments ORDER BY timestamp ASC LIMIT ?", (limit,))
     rows = c.fetchall()
     conn.close()
     return rows
@@ -431,5 +435,65 @@ def clear_comments():
     c.execute("DELETE FROM comments")
     conn.commit()
     conn.close()
+
+# --- Черновики (переживают рестарт бота) ---
+def save_draft(user_id, photo, text, document, channel):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO drafts (user_id, photo, text, document, channel, updated) VALUES (?, ?, ?, ?, ?, ?)",
+              (user_id, photo, text, document, channel, int(time.time())))
+    conn.commit()
+    conn.close()
+
+def get_user_draft(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT photo, text, document, channel FROM drafts WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return {'photo': row[0], 'text': row[1], 'document': row[2], 'channel': row[3]} if row else None
+
+def delete_draft(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM drafts WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+# --- Статистика публикаций (для аналитики дашборда) ---
+def get_post_stats():
+    """Возвращает количество опубликованных постов: всего, сегодня, за неделю и за месяц."""
+    import pytz
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM queue WHERE status='posted'")
+    total = c.fetchone()[0]
+
+    tashkent_tz = pytz.timezone('Asia/Tashkent')
+    now = datetime.now(tashkent_tz)
+    today_start = int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    week_start = int((now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    month_start = int((now - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+
+    def count_since(ts):
+        c.execute("SELECT COUNT(*) FROM queue WHERE status='posted' AND scheduled_time >= ?", (ts,))
+        return c.fetchone()[0]
+
+    today = count_since(today_start)
+    week = count_since(week_start)
+    month = count_since(month_start)
+
+    # Ежедневная динамика за последние 30 дней
+    labels, data = [], []
+    for i in range(29, -1, -1):
+        day = now - timedelta(days=i)
+        day_start = int(day.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        day_end = day_start + 86400
+        c.execute("SELECT COUNT(*) FROM queue WHERE status='posted' AND scheduled_time >= ? AND scheduled_time < ?", (day_start, day_end))
+        labels.append(day.strftime('%d.%m'))
+        data.append(c.fetchone()[0])
+    conn.close()
+    return {'total': total, 'today': today, 'week': week, 'month': month,
+            'labels': labels, 'data': data}
 
 init_db()

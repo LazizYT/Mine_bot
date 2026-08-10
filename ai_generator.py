@@ -5,6 +5,17 @@ from bs4 import BeautifulSoup
 from groq import Groq
 import database
 
+# Ленивая инициализация Groq-клиента.
+# Создаём клиент только при первом реальном запросе, чтобы отсутствие/невалидность
+# GROQ_API_KEY не роняло весь бот на импорте (Groq() бросает GroqError при api_key=None).
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = Groq(api_key=config.GROQ_API_KEY)
+    return _client
+
 # Промпт-инструкция для ИИ. Определяет роль, стиль и структуру поста.
 PROMPT_TEMPLATE = """
 Sen Minecraft modlari bo‘yicha professional Telegram kontent muharririsan.
@@ -52,7 +63,7 @@ Format:
 
 #Minecraft #[MosXeshteg1] #[MosXeshteg2] #[MosXeshteg3]
 
-💎 Obuna bo‘ling: @Lazikomods
+💎 Obuna bo‘ling: @lazikosmods
 
 Qo‘shimcha:
 - Agar mod juda mashhur bo‘lsa, hype darajasini oshir
@@ -62,8 +73,6 @@ Qo‘shimcha:
 - Har safar original va takrorlanmaydigan uslub yarat
 """
 
-# Инициализация клиента Groq для работы с ИИ
-client = Groq(api_key=config.GROQ_API_KEY)
 # Используемая модель ИИ
 MODEL_ID = "llama-3.3-70b-versatile"
 
@@ -155,12 +164,19 @@ def generate_post(user_input, persona="uz"):
     # Формируем полный промпт
     prompt = f"TASK: Write a Minecraft mod post strictly {target_lang}.\n\n{effective_prompt_template}\n\nDATA TO PROCESS:\n{user_input}\n{mod_metadata}\n{site_content}\n\nREMINDER: Use the VERIFIED MOD DATA if available. The entire post must be {target_lang}."
     
+    if not config.GROQ_API_KEY:
+        print("⚠️ generate_post: GROQ_API_KEY not set.")
+        return None
+
     try:
-        res = client.chat.completions.create(
+        res = _get_client().chat.completions.create(
             messages=[{"role": "user", "content": prompt}], 
             model=MODEL_ID
         )
         gen = res.choices[0].message.content.strip()
+        
+        # Приводим упоминание канала к актуальному хэндлу (из env CHANNELS)
+        gen = gen.replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
         
         # Добавляем рекламную подпись ПЕРЕД обработкой хэштегов, чтобы все чистилось вместе
         ad_text = database.get_global_setting('ad_text', '')
@@ -187,11 +203,14 @@ def generate_post(user_input, persona="uz"):
             
         return gen
     except Exception as e:
-        return f"Error: {e}"
+        print(f"Ошибка генерации поста: {e}")
+        return None
 
 
 def translate_post(text, target_persona="uz"):
     """Переводит готовый пост на другой язык, сохраняя всю HTML разметку и эмодзи."""
+    if not config.GROQ_API_KEY:
+        return None
     try:
         lang_map = {
             'uz': "O'zbek tili (Uzbek)",
@@ -202,16 +221,19 @@ def translate_post(text, target_persona="uz"):
         
         prompt = f"Translate this Telegram post strictly to {target_lang}. Keep all HTML tags like <b>, <blockquote>, <blockquote expandable> exactly as they are. Do not remove any emojis. Text to translate:\n\n{text}"
         
-        res = client.chat.completions.create(
+        res = _get_client().chat.completions.create(
             messages=[{"role": "user", "content": prompt}], 
             model=MODEL_ID
         )
-        return res.choices[0].message.content.strip()
+        return res.choices[0].message.content.strip().replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
     except Exception as e:
-        return f"Translation error: {e}"
+        print(f"Ошибка перевода: {e}")
+        return None
 
 def generate_reply(comment_text, persona="uz"):
     """Генерирует живой, человечный ответ на комментарий пользователя."""
+    if not config.GROQ_API_KEY:
+        return None
     try:
         # Инструкции для разных языков, чтобы сохранить "вайб"
         personality = {
@@ -233,16 +255,19 @@ def generate_reply(comment_text, persona="uz"):
         Faqat matn, xeshteglar kerak emas.
         """
 
-        res = client.chat.completions.create(
+        res = _get_client().chat.completions.create(
             messages=[{"role": "user", "content": prompt}], 
             model=MODEL_ID
         )
         return res.choices[0].message.content.strip().replace('"', '')
     except Exception as e:
+        print(f"Ошибка ответа на комментарий: {e}")
         return None
 
 def generate_suggestion_request(persona="uz"):
     """Генерирует пост с запросом предложений от подписчиков."""
+    if not config.GROQ_API_KEY:
+        return None
     try:
         lang_map = {'uz': "O'zbek tilida", 'ru': "на русском языке", 'en': "in English"}
         target_lang = lang_map.get(persona, "O'zbek tilida")
@@ -256,10 +281,64 @@ def generate_suggestion_request(persona="uz"):
         HTML teglaridan foydalan (<b>, <i>).
         """
 
-        res = client.chat.completions.create(
+        res = _get_client().chat.completions.create(
             messages=[{"role": "user", "content": prompt}], 
             model=MODEL_ID
         )
         return res.choices[0].message.content.strip()
     except Exception as e:
+        print(f"Ошибка генерации опроса: {e}")
         return None
+
+def rewrite_post(text, style="short", persona="uz"):
+    """Переписывает готовый пост в выбранном стиле (short/long/funny/pro)."""
+    if not config.GROQ_API_KEY:
+        return None
+    try:
+        style_map = {
+            'short': 'very short and punchy, keep only the key info (3-5 lines), still with a CTA',
+            'long': 'detailed and comprehensive, expand every feature into its own point',
+            'funny': 'funny, hype, casual and meme-like tone, keep it engaging',
+            'pro': 'professional, clean, structured marketing tone'
+        }
+        lang_map = {'uz': "O'zbek tilida", 'ru': "на русском языке", 'en': "in English"}
+        target_lang = lang_map.get(persona, "O'zbek tilida")
+
+        prompt = f"""
+Rewrite the Telegram post below {target_lang}.
+Style: {style_map.get(style, style_map['short'])}.
+Keep all HTML tags (<b>, <blockquote>, <blockquote expandable>) and emojis.
+Keep the same hashtags structure. Do not add a signature.
+Post:
+{text}
+"""
+        res = _get_client().chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=MODEL_ID
+        )
+        return res.choices[0].message.content.strip().replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
+    except Exception as e:
+        print(f"Ошибка рерайта: {e}")
+        return None
+
+def improve_prompt(description):
+    """Улучшает пользовательское описание до полноценного system-промпта для ИИ."""
+    if not config.GROQ_API_KEY:
+        return description
+    try:
+        prompt = f"""
+You are an expert prompt engineer. A Telegram content bot about Minecraft mods lets the admin define an AI "persona" (system prompt). 
+Turn the short description below into a detailed, ready-to-use system prompt. 
+Rules: write in the same language as the description, keep it structured (role, goal, style, format rules), use bullet points. 
+Do NOT add any commentary outside the prompt itself.
+
+Description: "{description}"
+"""
+        res = _get_client().chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=MODEL_ID
+        )
+        return res.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Ошибка улучшения промпта: {e}")
+        return description

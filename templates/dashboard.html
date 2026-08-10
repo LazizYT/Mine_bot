@@ -71,10 +71,30 @@
 
     <div class="tab-content">
         <div class="tab-pane fade show active" id="queue">
-            <!-- ... (существующий код очереди) ... -->
+            <div class="row" id="sortable-queue">
+                {% for item in queue %}
+                <div class="col-md-4 mb-3" data-id="{{ item.id }}">
+                    <div class="card p-3 h-100">
+                        <div class="handle mb-2">⠿ DRAG TO REORDER</div>
+                        <span class="badge bg-dark border border-secondary mb-2">{{ item.time_str }}</span>
+                        <h6 style="color: var(--neon-g);">{{ item.channel }}</h6>
+                        <div style="font-size: 0.65rem; color: #fff; max-height: 90px; overflow: hidden;">{{ item.text|striptags|truncate(220) }}</div>
+                        <div class="mt-3 d-flex gap-2">
+                            <button class="btn btn-sm btn-primary-mc btn-mc btn-execute" onclick="publishNow({{ item.id }})">EXECUTE</button>
+                            <button class="btn btn-sm btn-purple-mc btn-mc btn-edit" onclick="editPost({{ item|tojson }})">EDIT</button>
+                            <button class="btn btn-sm btn-danger-mc btn-mc btn-drop" onclick="deletePost({{ item.id }})">DROP</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not queue %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">NO PENDING POSTS</h4>
+            </div>
+            {% endif %}
         </div>
-
-        {% include 'parts/curseforge.html' %}
 
         <div class="tab-pane fade" id="published-history">
             <div class="card p-4">
@@ -158,6 +178,16 @@
                     <div class="card p-4 mt-2">
                         <h6 id="head-growth" style="color: var(--neon-g);">GROWTH_CURVE.DATA</h6>
                         <canvas id="subsChart" height="150"></canvas>
+                    </div>
+                    <div class="card p-4 mt-2">
+                        <h6 style="color: var(--neon-g);">PUBLISHED_PER_DAY</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">TOTAL</div><div class="fw-bold text-white">{{ post_stats.total }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">TODAY</div><div class="fw-bold" style="color: var(--neon-g);">+{{ post_stats.today }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">WEEK</div><div class="fw-bold text-info">{{ post_stats.week }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">MONTH</div><div class="fw-bold text-warning">{{ post_stats.month }}</div></div></div>
+                        </div>
+                        <canvas id="postsChart" height="120"></canvas>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -320,10 +350,25 @@
     function loadComments() {
         fetch('/api/comments').then(r => r.json()).then(data => {
             const list = document.getElementById('comments-list');
+            list.innerHTML = '';
             if (!data || data.length === 0) {
-                list.innerHTML = '<p class="text-white-50" style="font-size: 0.7rem; text-align: center; padding: 20px;">[NO_NEW_DATA_LOGGED]</p>';
+                const p = document.createElement('p');
+                p.className = 'text-white-50';
+                p.style.cssText = 'font-size: 0.7rem; text-align: center; padding: 20px;';
+                p.textContent = '[NO_NEW_DATA_LOGGED]';
+                list.appendChild(p);
             } else {
-                list.innerHTML = data.map(c => `<div class="comment-item"><strong>${c.user}:</strong><br>${c.text}</div>`).join('');
+                data.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'comment-item';
+                    const strong = document.createElement('strong');
+                    strong.textContent = c.user + ':';
+                    const br = document.createElement('br');
+                    const text = document.createElement('span');
+                    text.textContent = c.text;
+                    div.appendChild(strong); div.appendChild(br); div.appendChild(text);
+                    list.appendChild(div);
+                });
             }
         });
     }
@@ -341,10 +386,13 @@
     function clearComments() { if(confirm('Clear all?')) fetch('/api/comments/clear', {method:'POST'}).then(() => loadComments()); }
 
     new Swiper(".mySwiper", { pagination: { el: ".swiper-pagination", clickable: true } });
-    Sortable.create(document.getElementById('sortable-queue'), { animation: 150, handle: '.handle', onEnd: function() { 
-        const order = Array.from(document.querySelectorAll('.col-md-4')).map(i => i.dataset.id);
-        fetch('/api/reorder', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({order}) });
-    }});
+    const sortableQueue = document.getElementById('sortable-queue');
+    if (sortableQueue) {
+        Sortable.create(sortableQueue, { animation: 150, handle: '.handle', onEnd: function() {
+            const order = Array.from(sortableQueue.querySelectorAll('.col-md-4')).map(i => i.dataset.id);
+            fetch('/api/reorder', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({order}) });
+        }});
+    }
 
     function initChart(data) {
         const ctx = document.getElementById('subsChart').getContext('2d');
@@ -375,6 +423,17 @@
     fetch('/api/stats').then(r => r.json()).then(data => {
         window.allStats = data;
         initChart(data);
+    });
+
+    fetch('/api/analytics').then(r => r.json()).then(p => {
+        const ctx2 = document.getElementById('postsChart');
+        if (!ctx2) return;
+        const bars = new Chart(ctx2.getContext('2d'), {
+            type: 'bar',
+            data: { labels: p.labels, datasets: [{ label: 'Posts', data: p.data, backgroundColor: '#39ff14', borderRadius: 2 }] },
+            options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#222' }, ticks: { color: '#fff', stepSize: 1 } }, x: { grid: { color: '#222' }, ticks: { color: '#fff' } } } }
+        });
+        window.postsChartInstance = bars;
     });
 
     function toggleChannel(ch) {
@@ -420,80 +479,6 @@
     function activateWM(id) { fetch('/api/watermarks/activate/'+id, { method: 'POST' }).then(() => location.reload()); }
     function deleteWM(id) { if(confirm('Delete watermark?')) fetch('/api/watermarks/delete/'+id, { method: 'POST' }).then(() => location.reload()); }
 
-    // --- CURSEFORGE EXPLORER LOGIC ---
-    let selectedCFMod = null;
-    function searchCF() {
-        const q = document.getElementById('cf-search-input').value;
-        if(!q) return;
-        const resultsDiv = document.getElementById('cf-results');
-        resultsDiv.innerHTML = '<div class="col-12 text-center py-5">⌛ Searching CurseForge...</div>';
-        
-        fetch('/api/curseforge/search?q=' + encodeURIComponent(q))
-            .then(r => r.json())
-            .then(data => {
-                if(data.length === 0) {
-                    resultsDiv.innerHTML = '<div class="col-12 text-center py-5">❌ No mods found.</div>';
-                    return;
-                }
-                resultsDiv.innerHTML = data.map(mod => `
-                    <div class="col-md-6 mb-3">
-                        <div class="card p-3 h-100" style="cursor: pointer;" onclick='openCFSchedule(${JSON.stringify(mod).replace(/'/g, "&apos;")})'>
-                            <div class="d-flex align-items-center">
-                                <img src="${mod.logo || '/static/no-image.png'}" style="width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; object-fit: cover;">
-                                <div style="flex: 1; overflow: hidden;">
-                                    <b style="color: var(--neon-g); font-size: 0.8rem;" class="text-truncate d-block">${mod.title}</b>
-                                    <small class="text-muted d-block text-truncate" style="font-size: 0.6rem;">${mod.summary || 'No description'}</small>
-                                    <div class="mt-1">
-                                        <span class="badge bg-dark text-success" style="font-size: 0.5rem;">📥 ${mod.downloads.toLocaleString()}</span>
-                                        <span class="badge bg-dark text-info" style="font-size: 0.5rem;">📦 ${mod.version}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            });
-    }
-
-    function openCFSchedule(mod) {
-        selectedCFMod = mod;
-        document.getElementById('cf-preview-logo').src = mod.logo || '/static/no-image.png';
-        document.getElementById('cf-preview-title').innerText = mod.title;
-        document.getElementById('cf-preview-version').innerText = mod.version;
-        document.getElementById('cf-post-time').value = "";
-        document.getElementById('cf-asap-check').checked = true;
-        new bootstrap.Modal(document.getElementById('cfScheduleModal')).show();
-    }
-
-    document.getElementById('cf-confirm-btn').onclick = function() {
-        const timeInput = document.getElementById('cf-post-time').value;
-        const isAsap = document.getElementById('cf-asap-check').checked;
-        let timestamp = null;
-        
-        if(!isAsap && timeInput) {
-            timestamp = Math.floor(new Date(timeInput).getTime() / 1000);
-        }
-        
-        this.disabled = true;
-        this.innerText = "⌛ Generating Post...";
-        
-        fetch('/api/curseforge/create-post', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                mod_id: selectedCFMod.id,
-                time: timestamp
-            })
-        }).then(r => r.json()).then(data => {
-            if(data.status === 'success') {
-                location.reload();
-            } else {
-                alert('Error: ' + data.error);
-                this.disabled = false;
-                this.innerText = "🚀 CREATE & QUEUE";
-            }
-        });
-    };
 </script>
 </body>
 </html>

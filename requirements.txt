@@ -1,11 +1,9 @@
 pyTelegramBotAPI
 APScheduler
 python-dotenv
-google-genai
 groq
 requests
 beautifulsoup4
 Pillow
 pytz
 flask
-playwright

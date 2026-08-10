@@ -96,6 +96,7 @@ BUTTONS = {
         'pro': "Pro",
         'exact': "📅 Aniq vaqt",
         'translate': "🔄 Tarjima qilish",
+        'resume_draft': "Qoralamani tiklash",
         'audience': "Auditoriya"
     },
     'ru': {
@@ -116,6 +117,7 @@ BUTTONS = {
         'pro': "Профи",
         'exact': "📅 Точная дата",
         'translate': "🔄 Перевести",
+        'resume_draft': "Восстановить черновик",
         'audience': "Аудитория"
     },
     'en': {
@@ -136,6 +138,7 @@ BUTTONS = {
         'pro': "Professional",
         'exact': "📅 Exact Time",
         'translate': "🔄 Translate",
+        'resume_draft': "Restore draft",
         'audience': "Audience"
     }
 }

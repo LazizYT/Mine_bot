@@ -2,16 +2,30 @@ import config
 import database
 from groq import Groq
 
-# Инициализация Groq
-client = Groq(api_key=config.GROQ_API_KEY)
 MODEL_ID = "llama-3.3-70b-versatile"
 
+# Ленивая инициализация Groq-клиента (см. ai_generator.py — Groq() падает при пустом ключе).
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = Groq(api_key=config.GROQ_API_KEY)
+    return _client
+
 def analyze_comments():
-    """Собирает комментарии из БД и просит Groq сделать выжимку"""
+    """Собирает последние комментарии из БД и просит Groq сделать выжимку."""
+    if not config.GROQ_API_KEY:
+        return "❌ GROQ_API_KEY не задан — анализ комментариев недоступен."
+
     comments = database.get_all_comments()
-    
+
     if not comments:
         return "📭 Пока нет новых комментариев от подписчиков."
+
+    # Ограничиваем объём: берём только последние 200 комментариев,
+    # чтобы не превысить контекст модели.
+    comments = comments[-200:]
 
     # Собираем все комментарии в один текст
     comments_text = "\n".join([f"- {c[0]}: {c[1]}" for c in comments])
@@ -41,7 +55,7 @@ def analyze_comments():
     """
 
     try:
-        completion = client.chat.completions.create(
+        completion = _get_client().chat.completions.create(
             messages=[
                 {"role": "user", "content": prompt}
             ],
