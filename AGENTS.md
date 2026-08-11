@@ -6,9 +6,9 @@ opencode сразу знал контекст.
 
 ## Кратко о проекте
 
-- Telegram-бот (pyTelegramBotAPI) для автоматизации канала @lazikosmods про Minecraft-моды
+- Telegram-бот (pyTelegramBotAPI) для автоматизации канала @lazikomods про Minecraft-моды
   + Flask веб-панель управления (dashboard).
-  - ВАЖНО: канал — именно **@lazikosmods** (с 's'), подтверждено пользователем. В коде теперь везде подставляется актуальный хэндл из env CHANNELS.
+  - ВАЖНО: канал — именно **@lazikomods** (БЕЗ 's'!), подтверждено пользователем. В коде подставляется актуальный хэндл из env CHANNELS.
 - ИИ: Groq (llama-3.3-70b-versatile), промпт хранится в БД и редактируется из веб-панели.
 - БД: SQLite. Медиа: водяные знаки через Pillow. Планировщик: APScheduler.
 - Точка входа: `main.py` (запуск через `launcher.py`). Веб-сервер: `webapp.py` (порт из `PORT`, дефолт 8080).
@@ -20,7 +20,7 @@ opencode сразу знал контекст.
 
 ## Обязательные env-переменные (файл `.env`, НЕ коммитится)
 
-- `TELEGRAM_TOKEN` (обязательная), `GROQ_API_KEY`, `GEMINI_KEY`, `CHANNELS` (фактически `@lazikosmods`), `PORT` (дефолт 8080). Опционально `PANEL_USER`/`PANEL_PASSWORD` (запасной вход по паролю; на проде заданы), `PANEL_AUTH_REQUIRED` (дефолт 1 — авторизация ОБЯЗАТЕЛЬНА).
+- `TELEGRAM_TOKEN` (обязательная), `GROQ_API_KEY`, `GEMINI_KEY`, `CHANNELS` (фактически `@lazikomods`), `PORT` (дефолт 8080). Опционально `PANEL_USER`/`PANEL_PASSWORD` (запасной вход по паролю; на проде заданы), `PANEL_AUTH_REQUIRED` (дефолт 1 — авторизация ОБЯЗАТЕЛЬНА).
 - CurseForge удалён полностью (env `CURSEFORGE_API_KEY` больше не читается).
 - `ADMIN_IDS` задаётся в `config.py`, а не в env.
 - `DB_PATH` — путь к SQLite (дефолт `data/bot_data.db` относительно рабочей папки → в контейнере `/app/data/bot_data.db`, на volume).
@@ -48,7 +48,7 @@ opencode сразу знал контекст.
    - **Бэкапы БД**: `database.backup_db()` (SQLite online backup API, безопасен при WAL) в `data/backups/`, хранит 14 копий, ежедневно в 03:05 (джоб в `main.py`).
    - **Тесты при сборке**: Dockerfile теперь запускает `python -m unittest` (dummy env-токены на время сборки) — сломанный код не доедет до деплоя. Всего **62 теста OK** (включая `test_panel_auth.py` — 7 тестов, и пагинация audit).
    - **Пагинация AUDIT** в /platform: `/api/platform/audit` принимает `page`/`per_page`/`action` и возвращает `total`/`pages`; в панели PREV/NEXT + счётчик.
-   - **ПРОД-ENV ИСПРАВЛЕН**: было `CHANNELS=@lazikomods` (без 's'!) → исправлено на `@lazikosmods`. Добавлены `PANEL_USER=admin` + `PANEL_PASSWORD` (запасной вход по паролю).
+   - **ПРОД-ENV**: `CHANNELS=@lazikomods` (БЕЗ 's', подтверждено пользователем). PANEL_USER/PANEL_PASSWORD заданы (запасной вход по паролю).
    - **Проблема**: панель теперь требует авторизации — при первом открытии через Telegram WebApp покажется страница входа с кнопкой "ВОЙТИ ЧЕРЕЗ TELEGRAM" (автоматически). Если открывать из обычного браузера — логин/пароль.
 
 0. **CONTENT DISTRIBUTION PLATFORM (2026-08-11, фазы 1-8)**:
@@ -77,7 +77,7 @@ opencode сразу знал контекст.
    - Опциональная Basic-авторизация панели (env PANEL_USER/PANEL_PASSWORD; если пароль пуст — панель открыта).
    - Groq-клиент теперь создаётся лениво (`_get_client()`) — отсутствие GROQ_API_KEY больше НЕ роняет бота при импорте. `generate_post`/`translate_post`/`rewrite_post` возвращают None при ошибке (раньше ошибка попадала в пост).
    - Добавлена отсутствовавшая `ai_generator.rewrite_post()` — фича «рерайт» раньше падала AttributeError.
-   - Канал: `WATERMARK_TEXT` и промпт приведены к @lazikosmods, в сгенерированном тексте хэндл подменяется на `config.DEFAULT_CHANNEL`.
+   - Канал: `WATERMARK_TEXT` и промпт приведены к @lazikomods, в сгенерированном тексте хэндл подменяется на `config.DEFAULT_CHANNEL`.
    - Фото без подписи больше не ломает генерацию (заглушка "Minecraft mod photo").
    - Альбомы: уникальные temp-файлы + очистка в finally (была гонка + мусор на диске).
    - Callback `sel_`: split по `_` с maxsplit=2 — каналы с `_` в username больше не ломаются.
@@ -97,12 +97,12 @@ opencode сразу знал контекст.
 
 Приложение полностью настроено через MCP (инструменты `jrnm_*`):
 
-- **Env-переменные заданы**: TELEGRAM_TOKEN, GROQ_API_KEY, GEMINI_KEY, CHANNELS=@lazikosmods, PORT=8080. (CURSEFORGE_API_KEY НЕ задан — пользователь решил пропустить, функция не работает; в логах соответствующий warning.)
+- **Env-переменные заданы**: TELEGRAM_TOKEN, GROQ_API_KEY, GEMINI_KEY, CHANNELS=@lazikomods, PORT=8080. (CURSEFORGE_API_KEY НЕ задан — пользователь решил пропустить, функция не работает; в логах соответствующий warning.)
 - **Порт**: HTTPS mapping containerPort **8080** → внешний 80, домен `gitr_e2r5d-883` → `https://gitr_e2r5d-883.xs001.jrnm.app` открывает дашборд.
 - **Volume**: `/app/data` (id 49215). Старый `/data` удалён. БД и водяные знаки лежат на volume — **проверено**: после рестарта маркер-файл и `bot_data.db` сохранились.
 - **Run command**: задана явно `python launcher.py` (через `jrnm_set_app_command`).
 - Статус: RUNNING, restarts 0. В логах только warning про CurseForge, бот + Flask (порт 8080) поднялись.
-- Значения для env взяты из локального `.env` (в нём теперь есть TELEGRAM_TOKEN, GROQ_API_KEY, GEMINI_KEY, CHANNELS=@lazikosmods).
+- Значения для env взяты из локального `.env` (в нём теперь есть TELEGRAM_TOKEN, GROQ_API_KEY, GEMINI_KEY, CHANNELS=@lazikomods).
 
 ### Деплой через git (проверено 2026-08-10)
 - Git remote: `https://Bc2g6:d7A9Xxs6H@justrunmy.app/git/r_e2R5D` (branch `deploy`), командой `git push justrunmy HEAD:deploy`.

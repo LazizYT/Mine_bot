@@ -69,7 +69,7 @@ class TestSchedulerEngine(unittest.TestCase):
     def test_add_to_storage_and_queue(self):
         pid, qid = se.add_to_storage_and_queue(
             text="Scheduled via engine", media="", media_type="text",
-            channel_id=1, channel_username="@lazikosmods",
+            channel_id=1, channel_username="@lazikomods",
             scheduled_time=int(time.time()) + 3600, category="Mods", tags="sodium",
             language="ru", source="telegram", priority=5)
         self.assertIsNotNone(pid)
@@ -111,8 +111,8 @@ class TestSchedulerEngine(unittest.TestCase):
 
     def test_select_best_post(self):
         pid, _ = cs.create_post(text="Select me", status='available')
-        settings = se.build_channel_settings(1, '@lazikosmods')
-        chosen = se.select_best_post(1, '@lazikosmods', settings)
+        settings = se.build_channel_settings(1, '@lazikomods')
+        chosen = se.select_best_post(1, '@lazikomods', settings)
         self.assertEqual(chosen, pid)
 
     def test_run_scheduler_dry_run(self):

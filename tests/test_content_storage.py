@@ -84,9 +84,9 @@ class TestContentStorage(unittest.TestCase):
         settings = {'reuse_mode': 'never', '_published_channels_map': {}}
         post = cs.get_post(pid)
         self.assertTrue(cs.check_reuse(post, 1, settings))
-        cs.mark_used(pid, '@lazikosmods')
+        cs.mark_used(pid, '@lazikomods')
         p = cs.get_post(pid)
-        self.assertIn('@lazikosmods', p['published_channels'])
+        self.assertIn('@lazikomods', p['published_channels'])
         self.assertEqual(p['usage_count'], 1)
 
     def test_select_post_fifo(self):

@@ -82,7 +82,7 @@ class TestPlatformAPI(unittest.TestCase):
         self.assertEqual(r.get_json()['item']['interval_hours'], 9)
 
     def test_networks(self):
-        r = self.client.post('/api/platform/networks', json={'name': 'N', 'channels': ['@lazikosmods']})
+        r = self.client.post('/api/platform/networks', json={'name': 'N', 'channels': ['@lazikomods']})
         self.assertEqual(r.status_code, 200)
         nid = r.get_json()['network_id']
         r = self.client.get('/api/platform/networks')

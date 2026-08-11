@@ -501,7 +501,7 @@ async function savePost() {
 
 async function publishPost(id) {
     if (!confirm('Publish post #' + id + ' now?')) return;
-    await api(`/api/platform/posts/${id}/publish`, 'POST', { channel: '@lazikosmods' });
+    await api(`/api/platform/posts/${id}/publish`, 'POST', { channel: '@lazikomods' });
     loadPosts();
 }
 async function dupPost(id) { await api(`/api/platform/posts/${id}/duplicate`, 'POST'); loadPosts(); }
@@ -597,7 +597,7 @@ async function deleteChannel() {
 }
 
 async function addChannelPrompt() {
-    const name = prompt('Channel username (e.g. @lazikosmods):');
+    const name = prompt('Channel username (e.g. @lazikomods):');
     if (!name) return;
     await api('/api/platform/channels', 'POST', { text: '', media: '', media_type: 'text', title: '', category: '', language: 'uz', tags: '', source: 'manual', priority: 5, status: 'available' });
     // ensure via a stub call: use PUT to create

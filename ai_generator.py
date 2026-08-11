@@ -63,7 +63,7 @@ Format:
 
 #Minecraft #[MosXeshteg1] #[MosXeshteg2] #[MosXeshteg3]
 
-💎 Obuna bo‘ling: @lazikosmods
+💎 Obuna bo‘ling: @lazikomods
 
 Qo‘shimcha:
 - Agar mod juda mashhur bo‘lsa, hype darajasini oshir

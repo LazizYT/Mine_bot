@@ -29,13 +29,13 @@ class TestQueueStorageIntegration(unittest.TestCase):
         conn.close()
 
     def test_channel_id_by_username(self):
-        cid = handlers._channel_id_by_username('@lazikosmods')
+        cid = handlers._channel_id_by_username('@lazikomods')
         self.assertIsNotNone(cid)
-        cid2 = handlers._channel_id_by_username('@lazikosmods')
+        cid2 = handlers._channel_id_by_username('@lazikomods')
         self.assertEqual(cid, cid2)
 
     def test_add_to_queue_integrated_text(self):
-        handlers._add_to_queue_integrated('', 'Hello from test', '', '@lazikosmods', None)
+        handlers._add_to_queue_integrated('', 'Hello from test', '', '@lazikomods', None)
         conn = database._connect()
         cur = conn.cursor()
         cur.execute("SELECT post_id, status, channel_id, text FROM queue ORDER BY id DESC LIMIT 1")
@@ -57,7 +57,7 @@ class TestQueueStorageIntegration(unittest.TestCase):
 
     def test_add_to_queue_integrated_scheduled(self):
         sched = int(time.time()) + 7200
-        handlers._add_to_queue_integrated('photo123', 'Scheduled with media', '', '@lazikosmods', sched)
+        handlers._add_to_queue_integrated('photo123', 'Scheduled with media', '', '@lazikomods', sched)
         post_id = self._last_post()
         self.assertIsNotNone(post_id)
         post = cs.get_post(post_id)
@@ -70,7 +70,7 @@ class TestQueueStorageIntegration(unittest.TestCase):
         conn.close()
 
     def test_add_to_queue_album(self):
-        handlers._add_to_queue_integrated('p1,p2,p3', 'Album post', '', '@lazikosmods', None)
+        handlers._add_to_queue_integrated('p1,p2,p3', 'Album post', '', '@lazikomods', None)
         post_id = self._last_post()
         self.assertIsNotNone(post_id)
         post = cs.get_post(post_id)
