@@ -261,9 +261,11 @@ def run_scheduler(bot, dry_run=False):
             content_storage.update_post(post_id, status='published')
             content_storage.mark_used(post_id, username)
             log_publication(post_id, ch['channel_id'], None, scheduled_at, 'SUCCESS', message_id=msg_id)
+            database.audit_log('auto_publish', f"post:{post_id}", new_value=f"{username} ok")
             notify_admin(f"✅ Опубликовано #{post_id} в {username}")
         else:
             log_publication(post_id, ch['channel_id'], None, scheduled_at, 'FAILED', error=msg_id)
+            database.audit_log('auto_publish_failed', f"post:{post_id}", new_value=f"{username}: {msg_id}")
             notify_admin(f"❌ Ошибка публикации #{post_id} в {username}: {msg_id}")
 
     return report
@@ -328,8 +330,10 @@ def retry_failed(bot):
             cur.execute("UPDATE publications SET status='SUCCESS', error='', retry_count = retry_count + 1, published_at = ? WHERE id = ?", (int(time.time()), pid))
             content_storage.update_post(post_id, status='published')
             content_storage.mark_used(post_id, username)
+            database.audit_log('retry_success', f"pub:{pid}", new_value=f"post:{post_id}")
         else:
             cur.execute("UPDATE publications SET retry_count = retry_count + 1, error = ?, published_at = ? WHERE id = ?", (err, int(time.time()), pid))
+            database.audit_log('retry_failed', f"pub:{pid}", new_value=err)
         conn.commit()
         conn.close()
         done += 1

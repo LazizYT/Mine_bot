@@ -146,9 +146,10 @@ def get_post(post_id):
 
 def update_post(post_id, **fields):
     """Обновляет поля поста. fields: text, title, category, tags, hashtags, language,
-    status, priority, media, media_type, caption, source."""
+    status, priority, media, media_type, caption, source, source_url + счётчики использования."""
     allowed = ['text', 'title', 'category', 'tags', 'hashtags', 'language', 'status',
-               'priority', 'media', 'media_type', 'caption', 'source', 'source_url']
+               'priority', 'media', 'media_type', 'caption', 'source', 'source_url',
+               'usage_count', 'is_used', 'times_published', 'last_used_at', 'published_channels']
     conn = database._connect()
     cur = conn.cursor()
     sets, vals = [], []
@@ -375,11 +376,11 @@ def select_post(channel_id, settings, exclude_post_ids=None):
         return None
 
     if selection == 'fifo':
-        return min(allowed, key=lambda r: r[13])[0]
+        return min(allowed, key=lambda r: (r[13], r[0]))[0]
     if selection == 'lifo':
-        return max(allowed, key=lambda r: r[13])[0]
+        return max(allowed, key=lambda r: (r[13], r[0]))[0]
     if selection == 'least_used':
-        return min(allowed, key=lambda r: (r[8], r[13]))[0]
+        return min(allowed, key=lambda r: (r[8], r[13], r[0]))[0]
     if selection == 'weighted':
         # вес: приоритет -> вероятность
         weights = []

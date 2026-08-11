@@ -76,6 +76,8 @@
                     <li class="nav-item"><a class="nav-link" data-sec="scheduler" href="#"><i class="bi bi-clock-history"></i> SCHEDULER</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="publications" href="#"><i class="bi bi-send-check"></i> PUBLICATIONS</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="analytics" href="#"><i class="bi bi-graph-up"></i> ANALYTICS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="errors" href="#"><i class="bi bi-exclamation-triangle"></i> ERRORS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="audit" href="#"><i class="bi bi-journal-text"></i> AUDIT</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="events" href="#"><i class="bi bi-activity"></i> EVENTS</a></li>
                 </ul>
             </div>
@@ -233,6 +235,43 @@
                 </div>
             </div>
 
+            <!-- ERRORS -->
+            <div id="sec-errors" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">ERRORS</h5>
+                        <div class="ms-auto d-flex gap-2">
+                            <button class="btn btn-danger-mc btn-mc btn-sm" onclick="retryAll()">RETRY FAILED</button>
+                        </div>
+                    </div>
+                    <div class="row" id="errors-summary"></div>
+                    <div class="mt-2 table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead><tr><th>ID</th><th>POST</th><th>CHANNEL</th><th>STATUS</th><th>RETRIES</th><th>ERROR</th><th>TIME</th></tr></thead>
+                            <tbody id="errors-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AUDIT -->
+            <div id="sec-audit" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">AUDIT LOG</h5>
+                        <select class="form-select form-select-sm ms-auto" id="audit-action" style="width:180px;" onchange="loadAudit()">
+                            <option value="">ALL ACTIONS</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead><tr><th>#</th><th>ACTION</th><th>TARGET</th><th>NEW VALUE</th><th>TIME</th></tr></thead>
+                            <tbody id="audit-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- EVENTS -->
             <div id="sec-events" style="display:none;">
                 <div class="card p-3">
@@ -340,6 +379,8 @@ sections.forEach(s => s.addEventListener('click', e => {
     if (s.dataset.sec === 'scheduler') { loadTestMode(); loadCalendar(); }
     if (s.dataset.sec === 'publications') loadPublications();
     if (s.dataset.sec === 'analytics') loadAnalytics();
+    if (s.dataset.sec === 'errors') loadErrors();
+    if (s.dataset.sec === 'audit') loadAudit();
     if (s.dataset.sec === 'events') loadEvents();
 }));
 
@@ -755,6 +796,59 @@ async function loadAnalytics() {
         data: { labels, datasets: [{ label: 'Publications', data: vals, backgroundColor: 'rgba(57,255,20,0.4)', borderColor: '#39ff14', borderWidth: 1 }] },
         options: { scales: { y: { beginAtZero: true, ticks: { color: '#888' } }, x: { ticks: { color: '#888' } } }, plugins: { legend: { labels: { color: '#fff' } } } }
     });
+}
+
+// ---------- ERRORS ----------
+async function loadErrors() {
+    const d = await api('/api/platform/publications?status=FAILED&per_page=50');
+    const items = d.items || [];
+    let errTypes = {};
+    items.forEach(p => { const k = (p.error || 'unknown').slice(0, 60); errTypes[k] = (errTypes[k] || 0) + 1; });
+    const top = Object.entries(errTypes).sort((a,b) => b[1] - a[1]).slice(0, 4);
+    document.getElementById('errors-summary').innerHTML =
+        statCard('FAILED', items.length) + top.map(([e, c]) =>
+            `<div class="col-md-3 col-6"><div class="card p-2 text-center"><div class="stat-num" style="font-size:1rem;">${c}</div><div class="stat-label post-preview">${e}</div></div></div>`).join('');
+    const tbody = document.getElementById('errors-table');
+    tbody.innerHTML = '';
+    items.forEach(p => {
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td>#${p.id}</td>
+            <td>#${p.post_id}</td>
+            <td style="color:var(--neon-g)">${p.channel || ''}</td>
+            <td style="color:#ff0033">${p.status}</td>
+            <td>${p.retry_count}</td>
+            <td class="post-preview" style="max-width:200px">${p.error || ''}</td>
+            <td>${p.scheduled_at ? new Date(p.scheduled_at * 1000).toLocaleString() : '-'}</td>
+        </tr>`);
+    });
+    if (!items.length) tbody.innerHTML = '<tr><td colspan="7" class="text-center small-text py-4">NO FAILED PUBLICATIONS</td></tr>';
+}
+
+// ---------- AUDIT ----------
+let auditActions = new Set();
+async function loadAudit() {
+    const d = await api('/api/platform/audit?limit=300');
+    const sel = document.getElementById('audit-action');
+    const oldVal = sel.value;
+    d.items.forEach(i => auditActions.add(i.action));
+    const opts = ['<option value="">ALL ACTIONS</option>'] + [...auditActions].sort().map(a =>
+        `<option ${a === oldVal ? 'selected' : ''}>${a}</option>`).join('');
+    if (sel.innerHTML !== opts) sel.innerHTML = opts;
+    const filtered = oldVal ? d.items.filter(i => i.action === oldVal) : d.items;
+    const tbody = document.getElementById('audit-table');
+    tbody.innerHTML = '';
+    filtered.forEach(i => {
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td>#${i.id}</td>
+            <td><span class="badge bg-dark border border-secondary">${i.action}</span></td>
+            <td class="post-preview" style="max-width:150px">${i.target || ''}</td>
+            <td class="post-preview" style="max-width:220px">${i.new_value || ''}</td>
+            <td>${new Date(i.created_at * 1000).toLocaleString()}</td>
+        </tr>`);
+    });
+    if (!filtered.length) tbody.innerHTML = '<tr><td colspan="5" class="text-center small-text py-4">NO AUDIT RECORDS</td></tr>';
 }
 
 // ---------- EVENTS ----------

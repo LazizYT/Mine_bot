@@ -227,6 +227,7 @@ def network_channels(nid):
 
 
 def add_channel_to_network(nid, channel_username):
+    ensure_settings(channel_username)
     conn = _connect()
     cur = conn.cursor()
     cur.execute("SELECT id FROM managed_channels WHERE username = ?", (channel_username,))

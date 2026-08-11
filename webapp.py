@@ -531,6 +531,7 @@ def api_platform_posts_create():
         status=data.get('status', 'available'))
     if post_id is None:
         return jsonify({'status': 'error', 'error': 'Duplicate or invalid'}), 400
+    database.audit_log('post_create', f"post:{post_id}", new_value=data.get('text', '')[:100])
     return jsonify({'status': 'success', 'post_id': post_id, 'duplicate': bool(dup)})
 
 
@@ -559,30 +560,35 @@ def api_platform_post_update(post_id):
         conn = database._connect()
         content_storage._sync_tags(conn, post_id, tags)
         conn.close()
+    database.audit_log('post_update', f"post:{post_id}", new_value=str(list(fields.keys())))
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/platform/posts/<int:post_id>', methods=['DELETE'])
 def api_platform_post_delete(post_id):
     content_storage.delete_post(post_id)
+    database.audit_log('post_delete', f"post:{post_id}")
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/platform/posts/<int:post_id>/archive', methods=['POST'])
 def api_platform_post_archive(post_id):
     content_storage.archive_post(post_id)
+    database.audit_log('post_archive', f"post:{post_id}")
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/platform/posts/<int:post_id>/restore', methods=['POST'])
 def api_platform_post_restore(post_id):
     content_storage.restore_post(post_id)
+    database.audit_log('post_restore', f"post:{post_id}")
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/platform/posts/<int:post_id>/duplicate', methods=['POST'])
 def api_platform_post_duplicate(post_id):
     new_id = content_storage.duplicate_post(post_id)
+    database.audit_log('post_duplicate', f"post:{post_id}", new_value=f"post:{new_id}")
     return jsonify({'status': 'success', 'post_id': new_id})
 
 
@@ -609,6 +615,7 @@ def api_platform_post_publish(post_id):
         conn.close()
         channel_id = row[0] if row else None
     scheduler_engine.log_publication(post_id, channel_id, None, int(time.time()), 'SUCCESS')
+    database.audit_log('post_publish', f"post:{post_id}", new_value=username)
     return jsonify({'status': 'success'})
 
 
@@ -636,12 +643,14 @@ def api_platform_channel_update(username):
     data = request.json or {}
     channel_manager.save_settings(username, data)
     scheduler_engine.log_event('settings_update', f"Channel {username} settings updated", data=str(list(data.keys())))
+    database.audit_log('channel_update', username, new_value=str(list(data.keys())))
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/platform/channels/<path:username>/delete', methods=['POST'])
 def api_platform_channel_delete(username):
     channel_manager.delete_channel(username)
+    database.audit_log('channel_delete', username)
     return jsonify({'status': 'success'})
 
 
@@ -653,6 +662,7 @@ def api_platform_channels_clone():
     if not src or not targets:
         return jsonify({'status': 'error', 'error': 'source and targets required'}), 400
     count = channel_manager.clone_settings(src, targets)
+    database.audit_log('channels_clone', src, new_value=", ".join(targets))
     return jsonify({'status': 'success', 'count': count})
 
 
@@ -664,6 +674,7 @@ def api_platform_channels_bulk():
     if not channels or not updates:
         return jsonify({'status': 'error', 'error': 'channels and updates required'}), 400
     count = channel_manager.bulk_update(channels, updates)
+    database.audit_log('channels_bulk', ", ".join(channels), new_value=str(updates))
     return jsonify({'status': 'success', 'count': count})
 
 
@@ -688,6 +699,7 @@ def api_platform_networks_create():
     for ch in data.get('channels', []):
         if ch:
             channel_manager.add_channel_to_network(nid, ch)
+    database.audit_log('network_create', data.get('name', ''), new_value=str(nid))
     return jsonify({'status': 'success', 'network_id': nid})
 
 
@@ -698,12 +710,14 @@ def api_platform_network_update(nid):
         channel_manager.rename_network(nid, data['name'])
     if 'pause' in data:
         channel_manager.pause_network(nid, bool(data['pause']))
+    database.audit_log('network_update', f"net:{nid}", new_value=str(data))
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/platform/networks/<int:nid>', methods=['DELETE'])
 def api_platform_network_delete(nid):
     channel_manager.delete_network(nid)
+    database.audit_log('network_delete', f"net:{nid}")
     return jsonify({'status': 'success'})
 
 
@@ -718,6 +732,7 @@ def api_platform_network_channels(nid):
         channel_manager.add_channel_to_network(nid, username)
     else:
         channel_manager.remove_channel_from_network(nid, username)
+    database.audit_log('network_channel_' + action, f"net:{nid}", new_value=username)
     return jsonify({'status': 'success'})
 
 
@@ -725,6 +740,7 @@ def api_platform_network_channels(nid):
 def api_platform_network_clone(nid):
     data = request.json or {}
     new_id = channel_manager.clone_network(nid, data.get('name', ''))
+    database.audit_log('network_clone', f"net:{nid}", new_value=f"net:{new_id}")
     return jsonify({'status': 'success', 'network_id': new_id})
 
 
@@ -739,12 +755,14 @@ def api_platform_templates():
 def api_platform_templates_create():
     data = request.json or {}
     tid = channel_manager.create_template(data.get('name', ''), data.get('description', ''), data.get('data', {}))
+    database.audit_log('template_create', data.get('name', ''), new_value=str(tid))
     return jsonify({'status': 'success', 'template_id': tid})
 
 
 @app.route('/api/platform/templates/<int:tid>', methods=['DELETE'])
 def api_platform_template_delete(tid):
     channel_manager.delete_template(tid)
+    database.audit_log('template_delete', f"tpl:{tid}")
     return jsonify({'status': 'success'})
 
 
@@ -753,6 +771,7 @@ def api_platform_template_apply(tid):
     data = request.json or {}
     channels = data.get('channels', [])
     count = channel_manager.apply_template(tid, channels)
+    database.audit_log('template_apply', f"tpl:{tid}", new_value=", ".join(channels))
     return jsonify({'status': 'success', 'count': count})
 
 
@@ -763,6 +782,7 @@ def api_platform_scheduler_run():
     if data.get('test_mode') is not None:
         scheduler_engine.set_test_mode(bool(data['test_mode']))
     report = scheduler_engine.run_scheduler(bot, dry_run=dry_run)
+    database.audit_log('scheduler_run', new_value=str(report))
     return jsonify({'status': 'success', 'report': report, 'test_mode': scheduler_engine.test_mode_enabled()})
 
 
@@ -770,6 +790,7 @@ def api_platform_scheduler_run():
 def api_platform_scheduler_test_mode():
     data = request.json or {}
     scheduler_engine.set_test_mode(bool(data.get('enabled', False)))
+    database.audit_log('test_mode', new_value=str(scheduler_engine.test_mode_enabled()))
     return jsonify({'status': 'success', 'test_mode': scheduler_engine.test_mode_enabled()})
 
 
@@ -828,7 +849,15 @@ def api_platform_settings_update():
     for k, v in data.items():
         database.set_global_setting(k, str(v))
     scheduler_engine.log_event('settings_update', 'Global settings updated', data=str(list(data.keys())))
+    database.audit_log('settings_update', new_value=str(data))
     return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/audit', methods=['GET'])
+def api_platform_audit():
+    limit = int(request.args.get('limit', 200))
+    action = request.args.get('action')
+    return jsonify({'status': 'success', 'items': database.get_audit_log(limit=limit, action=action)})
 
 
 @app.route('/platform')

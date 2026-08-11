@@ -693,4 +693,27 @@ def clear_memory_notes():
     conn.commit()
     conn.close()
 
+# --- Аудит (audit_log) ---
+def audit_log(action, target='', old_value='', new_value='', user='admin'):
+    """Записывает действие в audit_log."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO audit_log (user, action, target, old_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+              (user, action, target, old_value, new_value, int(time.time())))
+    conn.commit()
+    conn.close()
+
+def get_audit_log(limit=200, action=None):
+    """История аудита. Фильтр по action (опционально)."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    if action:
+        c.execute("SELECT id, user, action, target, old_value, new_value, created_at FROM audit_log WHERE action = ? ORDER BY id DESC LIMIT ?", (action, limit))
+    else:
+        c.execute("SELECT id, user, action, target, old_value, new_value, created_at FROM audit_log ORDER BY id DESC LIMIT ?", (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [{'id': r[0], 'user': r[1], 'action': r[2], 'target': r[3],
+             'old_value': r[4], 'new_value': r[5], 'created_at': r[6]} for r in rows]
+
 init_db()

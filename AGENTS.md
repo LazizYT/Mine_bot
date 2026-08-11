@@ -48,6 +48,11 @@ opencode сразу знал контекст.
    - **Web-панель**: новая страница `/platform` (`templates/platform.html`) — Storage/Channels/Networks/Templates/Scheduler/Publications/Analytics/Events. API `/api/platform/*` (36 роутов: posts CRUD/archive/restore/duplicate/publish, channels settings/clone/bulk, networks CRUD/pause/clone, templates CRUD/apply, scheduler run/test-mode, publications history/retry, analytics, calendar, events, storage stats, settings).
    - **Фикс**: в `scheduler_engine.build_channel_settings` убран битый лишний запрос (`SELECT post_id ... FROM posts`).
    - **Фикс**: `channel_table()` — `reuse_mode`/`reuse_days` теперь отдаются корректно (была путаница).
+   - **Фикс**: `content_storage.update_post` — добавлены счётчики использования (`usage_count`, `is_used`, `times_published`, `last_used_at`, `published_channels`) — раньше `mark_used` молча их терял.
+   - **Фикс**: `channel_manager.add_channel_to_network` — теперь вызывает `ensure_settings` (иначе `network_id` не проставлялся, если канал ещё не имел настроек).
+   - **Аудит (Phase 9)**: `database.audit_log()`/`get_audit_log()`; запись во все мутирующие роуты `/api/platform/*` + в `run_scheduler`/`retry_failed`; API `/api/platform/audit`.
+   - **Страница ошибок**: разделы ERRORS (failed publications + топ ошибок) и AUDIT в `/platform`.
+   - **Тесты (Phase 9)**: `tests/` (unittest, стандартная библиотека, работают в Docker; отдельная временная БД через `DB_PATH`): `test_content_storage.py`, `test_channel_manager.py`, `test_scheduler_engine.py`, `test_webapp.py`, `test_handlers.py`. Запуск: `python -m unittest discover -s tests -p "test_*.py"`. **54 теста OK.**
    - **Тесты**: локально проверены CRUD постов, дедуп, селекторы, каналы/сети/шаблоны/clone/bulk, scheduler dry-run, calendar, аналитика, все `/api/platform/*` + `/platform` (200), интеграция queue→storage (post_id связан), `main`/`handlers` импортируются. Тестовые данные в БД очищены.
 
 1. `database.py` — `DB_PATH` теперь `os.getenv('DB_PATH', os.path.join('data','bot_data.db'))` (кроссплатформенно), папка создаётся автоматически.
