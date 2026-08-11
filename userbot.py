@@ -204,15 +204,21 @@ def _run():
     global _ub
     try:
         import asyncio
+        # ВАЖНО: Pyrogram берёт loop в конструкторе Client() — установим его заранее,
+        # иначе в потоке без текущего loop будет RuntimeError.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         from pyrogram import Client, filters
 
-        kwargs = {"api_id": int(config.USERBOT_API_ID), "api_hash": config.USERBOT_API_HASH}
+        # Pyrogram требует имя (name) всегда, даже при session_string.
         if config.USERBOT_SESSION_STRING:
-            kwargs["session_string"] = config.USERBOT_SESSION_STRING
+            _ub = Client("userbot", api_id=int(config.USERBOT_API_ID),
+                         api_hash=config.USERBOT_API_HASH,
+                         session_string=config.USERBOT_SESSION_STRING)
         else:
-            kwargs["session_name"] = config.USERBOT_SESSION_FILE
-
-        _ub = Client(**kwargs)
+            _ub = Client(config.USERBOT_SESSION_FILE, api_id=int(config.USERBOT_API_ID),
+                         api_hash=config.USERBOT_API_HASH)
 
         @_ub.on_message(filters.channel)
         def handle_channel_post(client, message):
@@ -233,9 +239,12 @@ def _run():
                 print(f"❌ userbot: handler error: {e}")
 
         print("🚀 Userbot (Pyrogram) запущен...")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        _ub.run()  # блокирующий цикл
+        # В фоновом потоке нельзя использовать _ub.run() (он зовёт idle(),
+        # который ставит обработчики сигналов — только main thread).
+        # start() в Pyrogram синхронный: вызываем его напрямую,
+        # затем держим event loop живым через run_forever.
+        _ub.start()
+        loop.run_forever()
     except Exception as e:
         print(f"❌ userbot: ошибка запуска: {e}")
     finally:
@@ -248,7 +257,15 @@ def stop():
     global _ub, _started
     if _ub is not None:
         try:
-            _ub.stop()
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.call_soon_threadsafe(lambda: asyncio.ensure_future(_ub.stop()))
+            else:
+                _ub.stop()
         except Exception:
-            pass
+            try:
+                _ub.stop()
+            except Exception:
+                pass
     _started = False
