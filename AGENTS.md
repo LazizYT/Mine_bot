@@ -41,6 +41,14 @@ opencode сразу знал контекст.
 
 ## Последние фиксы (сделаны)
 
+0. **USERBOT: РЕЛЕЙ-РЕЖИМ вместо скачивания/хранилища (2026-08-11)**:
+   - **Проблема**: юзербот качал медиа на диск → OOM на деплое (.mcaddon); потом появилась схема канала-хранилища.
+   - **НОВЫЙ ДИЗАЙН (по решению пользователя)**: юзербот НЕ скачивает, НЕ хранит, НЕ переводит и НЕ создаёт посты. Он ПЕРЕСЫЛАЕТ (server-side copy через `copy_message`/`copy_media_group`) каждый захваченный пост в ЛС основного бота (`USERBOT_BOT_USERNAME`, дефолт `@avto_postmine_bot`), добавляя в подпись скрытый маркер `__UBR__:<source_url>`.
+   - **Бот** (`handlers.py`): `_extract_ub_marker()` распознаёт маркер в `handle_text_photo` (добавлен 'video' в content_types), `process_album`, `handle_document`. При релее: `_handle_userbot_relay()` генерирует узбекскую версию через `ai_generator.generate_post`, сохраняет пост в Content Storage + умную очередь (`scheduler_engine.add_to_storage_and_queue`, source='userbot', scheduled_time=None → статус 'queued'). file_id валиден для бота (юзербот прислал медиа боту). Документ (файл мода): `_attach_document_to_userbot_post()` прикрепляет `doc:<file_id>` к последнему посту юзербота аккаунта (`ub_last_post`).
+   - **Публикация**: без изменений — scheduler читает media из storage (photos + `doc:` документы).
+   - **Убрано**: storage-канал (create_channel/add_chat_members/promote), `_translate`, `_download`, `_copy_to_storage`, `_st_ref`, поля `storage_chat_id`/`storage_channel_cfg` из status. Оставлено для совместимости в config (`USERBOT_STORAGE_CHANNEL/TITLE`), publisher storage-ветка не удалена (не мешает).
+   - **Тесты**: 67 OK (добавлен `test_userbot_relay_marker`).
+
 0. **USERBOT: канал-хранилище вместо скачивания (2026-08-11)**:
    - **Проблема**: юзербот качал медиа на диск → OOM при больших файлах (.mcaddon и т.п.) на деплое.
    - **Решение**: юзербот больше НЕ скачивает файлы. При старте создаёт приватный канал-хранилище (`client.create_channel` из `USERBOT_STORAGE_TITLE`, id в `global_settings['userbot_storage_chat_id']`), добавляет бота админом (`USERBOT_BOT_USERNAME`, дефолт `avto_postmine_bot`). Готовый канал можно задать вручную через `USERBOT_STORAGE_CHANNEL`.

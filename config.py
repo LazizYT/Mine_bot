@@ -40,15 +40,15 @@ USERBOT_SESSION_STRING = os.getenv("USERBOT_SESSION_STRING", "")
 USERBOT_SESSION_FILE = os.getenv("USERBOT_SESSION_FILE", os.path.join('data', 'userbot.session'))
 # Локальная папка для скачанного медиа (должна лежать на volume в Docker)
 USERBOT_MEDIA_DIR = os.getenv("USERBOT_MEDIA_DIR", os.path.join('data', 'userbot_media'))
-# Канал-хранилище: юзербот НЕ скачивает медиа, а копирует посты в приватный канал
-# (серверно, без нагрузки). id созданного канала сохраняется в global_settings
-# ('userbot_storage_chat_id'). Опционально можно задать готовый канал вручную:
-#   USERBOT_STORAGE_CHANNEL = "@username" или "-100xxxxxxxx"
-# USERBOT_STORAGE_TITLE — название, если канал будет создаваться автоматически.
+# Релей-режим (2026-08-11): юзербот НЕ скачивает медиа и НЕ создаёт посты сам.
+# Каждый захваченный пост пересылается (server-side copy) в ЛС основного бота
+# со скрытым маркером __UBR__:<source_url>. Бот переводит текст, сохраняет пост
+# в Content Storage и ставит в умную очередь.
+# USERBOT_BOT_USERNAME — кому пересылать (основной бот, @avto_postmine_bot).
+# (USERBOT_STORAGE_CHANNEL/TITLE больше не используются — оставлены для совместимости.)
 USERBOT_STORAGE_CHANNEL = os.getenv("USERBOT_STORAGE_CHANNEL", "")
 USERBOT_STORAGE_TITLE = os.getenv("USERBOT_STORAGE_TITLE", "Laziko Content Storage")
-# Username бота, которого юзербот добавит админом в созданный канал-хранилище.
-USERBOT_BOT_USERNAME = os.getenv("USERBOT_BOT_USERNAME", "")
+USERBOT_BOT_USERNAME = os.getenv("USERBOT_BOT_USERNAME", "avto_postmine_bot")
 
 # 🧠 НОВАЯ НАСТРОЙКА: Интервал умной очереди (в часах)
 SMART_QUEUE_INTERVAL_HOURS = 6

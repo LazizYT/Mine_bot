@@ -14,13 +14,20 @@ import ai_generator
 import watermarker
 import keyboards
 import publisher
+import content_storage
 import scheduler_engine
 import strings
 from bot_instance import bot
 
+# Маркер юзербота: бот распознаёт его в caption/text пересылаемого поста.
+UB_MARKER = "__UBR__:"
+
 # Глобальные словари для хранения текущего состояния пользователей
 user_current_draft_id = {} 
 user_states = {} 
+
+# last_post_id юзербота на аккаунт (для прикрепления документа к последнему посту)
+ub_last_post = {}
 
 def get_user_lang(user_id):
     return database.get_user_setting(user_id, 'persona', 'uz')
@@ -78,6 +85,90 @@ def _add_to_queue_integrated(photo, text, document, channel, scheduled_time=None
         channel_id=cid, channel_username=channel,
         scheduled_time=scheduled_time, language=lang, source='telegram')
 
+def _extract_ub_marker(text):
+    """Если в тексте есть маркер юзербота __UBR__:<source_url> — вернуть (чистый текст, source_url).
+    Иначе (исходный текст, None)."""
+    if not text or UB_MARKER not in text:
+        return text or "", None
+    idx = text.find(UB_MARKER)
+    clean = text[:idx].strip()
+    src = text[idx + len(UB_MARKER):].strip()
+    return clean, (src or None)
+
+def _handle_userbot_relay(message, clean_text, source_url, media="", media_type="text"):
+    """Пост переслан юзерботом: генерируем узбекскую версию и сразу ставим в умную очередь.
+    file_id из этого сообщения валиден для бота (юзербот прислал медиа сюда)."""
+    try:
+        user_id = message.from_user.id
+        lang = database.get_user_setting(user_id, 'persona', 'uz')
+        raw = clean_text or (message.caption or message.text or "") or "Minecraft mod photo"
+        # Убираем маркер из текста, если он остался в подписи
+        if UB_MARKER in raw:
+            raw, _ = _extract_ub_marker(raw)
+        generated = ai_generator.generate_post(raw or "Minecraft mod photo", lang)
+        if not generated:
+            generated = raw
+
+        if not media:
+            if message.photo:
+                media = message.photo[-1].file_id
+                media_type = 'photo'
+            elif message.video:
+                media = message.video.file_id
+                media_type = 'video'
+            else:
+                media_type = 'text'
+
+        channel = database.get_user_setting(user_id, 'active_channel', config.DEFAULT_CHANNEL)
+        cid = _channel_id_by_username(channel)
+        post_id, qid = scheduler_engine.add_to_storage_and_queue(
+            text=generated, media=media or "", media_type=media_type,
+            channel_id=cid, channel_username=channel,
+            scheduled_time=None, language=lang, source='userbot')
+        if post_id:
+            ub_last_post[user_id] = post_id
+            database.audit_log('userbot_relay', f"post:{post_id}", new_value=f"from {source_url}")
+            print(f"✅ userbot-relay: пост #{post_id} из {source_url} → умная очередь")
+            bot.send_message(message.chat.id,
+                             f"✅ Пост #{post_id} из юзербота принят (умная очередь)",
+                             reply_to_message_id=message.message_id)
+        else:
+            bot.reply_to(message, "⚠️ Не удалось создать пост (возможно дубликат).")
+    except Exception as e:
+        print(f"❌ userbot-relay: {e}")
+        try:
+            bot.reply_to(message, f"❌ Ошибка: {e}")
+        except Exception:
+            pass
+
+def _attach_document_to_userbot_post(message):
+    """Документ (файл мода) от юзербота — прикрепляем к последнему посту юзербота этого аккаунта."""
+    try:
+        user_id = message.from_user.id
+        post_id = ub_last_post.get(user_id)
+        if not post_id:
+            bot.reply_to(message, "⚠️ Нет последнего поста юзербота для прикрепления файла.")
+            return
+        post = content_storage.get_post(post_id)
+        if not post:
+            bot.reply_to(message, "⚠️ Последний пост юзербота не найден.")
+            return
+        doc_id = message.document.file_id
+        old_media = (post.get('media') or "").strip()
+        # Документы в media хранятся с префиксом doc:
+        new_media = f"{old_media},doc:{doc_id}" if old_media else f"doc:{doc_id}"
+        content_storage.update_post(post_id, media=new_media,
+                                    media_type='document' if not old_media else post.get('media_type', 'document'))
+        database.audit_log('userbot_relay_doc', f"post:{post_id}", new_value=f"attached doc to post")
+        print(f"✅ userbot-relay: файл прикреплён к посту #{post_id}")
+        bot.reply_to(message, f"📎 Файл прикреплён к посту #{post_id}.")
+    except Exception as e:
+        print(f"❌ userbot-relay doc: {e}")
+        try:
+            bot.reply_to(message, f"❌ Ошибка: {e}")
+        except Exception:
+            pass
+
 def register_handlers(bot_instance, user_drafts, album_cache):
     """Регистрация всех обработчиков."""
 
@@ -122,7 +213,7 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             try: bot.reply_to(message, reply_text)
             except: pass
 
-    @bot.message_handler(content_types=['text', 'photo'])
+    @bot.message_handler(content_types=['text', 'photo', 'video'])
     def handle_text_photo(message):
         # Обрабатываем только в личке, чтобы не мешать комментариям
         if message.chat.type != 'private': return
@@ -130,6 +221,14 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         user_id = message.from_user.id
         lang = get_user_lang(user_id)
         btns = strings.BUTTONS.get(lang, strings.BUTTONS['uz'])
+
+        # Релей от юзербота: в подписи скрытый маркер __UBR__:<source_url>.
+        # Альбомы (media_group) обрабатываются в process_album — там маркер в первой подписи.
+        if not message.media_group_id:
+            clean_text, src_url = _extract_ub_marker(message.caption or message.text)
+            if src_url:
+                _handle_userbot_relay(message, clean_text, src_url)
+                return
         
         if user_states.get(user_id) == "EDITING":
             target_id = user_current_draft_id.get(user_id)
@@ -240,6 +339,11 @@ def register_handlers(bot_instance, user_drafts, album_cache):
     def handle_document(message):
         if message.chat.type != 'private': return
         user_id = message.from_user.id
+        # Документ (файл мода) от юзербота: маркер в caption — прикрепляем к последнему посту
+        clean_text, src_url = _extract_ub_marker(message.caption or "")
+        if src_url:
+            _attach_document_to_userbot_post(message)
+            return
         target_id = user_current_draft_id.get(user_id)
         if target_id and target_id in user_drafts:
             curr = user_drafts[target_id].get('document', '')
@@ -386,6 +490,21 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         lang = get_user_lang(user_id)
         msgs = album_cache.get(media_group_id)
         if not msgs: return
+        # Релей от юзербота: маркер __UBR__ в первой подписи альбома
+        first_cap = next((m.caption for m in msgs if m.caption), "")
+        clean_text, src_url = _extract_ub_marker(first_cap)
+        if src_url:
+            p_ids = []
+            for m in msgs:
+                if m.photo:
+                    p_ids.append(m.photo[-1].file_id)
+                elif m.video:
+                    p_ids.append(m.video.file_id)
+            media_str = ",".join(p_ids)
+            _handle_userbot_relay(msgs[0], clean_text or first_cap, src_url,
+                                  media=media_str, media_type='album')
+            if media_group_id in album_cache: del album_cache[media_group_id]
+            return
         status = bot.send_message(chat_id, get_txt(user_id, 'album_loading'))
         temp_files = []
         try:

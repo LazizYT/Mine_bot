@@ -1,31 +1,33 @@
 """USERBOT (Pyrogram) — перехват постов из каналов-источников (RU/EN).
 
 Подписанный аккаунт слушает указанные каналы (userbot_sources). При новом посте:
-  - скачивает медиа (фото / альбом / видео / документ + вложенный файл),
-  - переводит текст на узбекский через Groq (ai_generator.translate_post),
-  - сохраняет результат в Content Storage (статус 'available') для последующей
-    автопубликации в каналы.
+  - НИЧЕГО не скачивает и не хранит локально,
+  - пересылает (server-side copy) пост в ЛС основного бота (@avto_postmine_bot),
+    добавляя в подпись скрытый маркер __UBR__:<source_url>,
+  - основной бот распознаёт маркер, переводит текст на узбекский, сохраняет пост
+    в Content Storage + умную очередь и публикует в каналы.
 
 Тщательная логика (2026-08-11):
   * Антиповтор: каждая обработанная message_id фиксируется в `userbot_history`
-    (UNIQUE по source_username+message_id). Один и тот же пост НИКОГДА не качается
-    дважды — ни при рестарте, ни при дублировании апдейтов.
-  * Альбомы: все фото одного media_group объединяются в ОДИН пост (media_type=album).
+    (UNIQUE по source_username+message_id). Один и тот же пост НИКОГДА не
+    пересылается дважды — ни при рестарте, ни при дублировании апдейтов.
+  * Альбомы: вся media_group пересылается в бота одним copy_media_group.
   * Бэкфилл: при старте догоняются посты, пропущенные пока юзербот был офлайн.
-  * Видео: скачивается как media_type=video и корректно публикуется (send_video).
 
 Библиотека Pyrogram подключена лениво: если юзербот отключён в env (USERBOT_ENABLED=0)
 или нет API_ID/API_HASH — клиент не создаётся и никакие ошибки не возникают.
 """
 import os
-import time
 import threading
 
 import config
 import database
-import content_storage
-import ai_generator
 import scheduler_engine
+
+
+# Скрытый маркер, который юзербот добавляет в подпись пересылаемого поста.
+# Основной бот ищет его в caption/text и обрабатывает пост как «релей от юзербота».
+UB_MARKER = "__UBR__:"
 
 
 _ub = None           # Pyrogram Client (ленивый)
@@ -64,270 +66,115 @@ def status():
         'has_session_string': bool(config.USERBOT_SESSION_STRING),
         'has_session_file': os.path.exists(config.USERBOT_SESSION_FILE),
         'session_file': config.USERBOT_SESSION_FILE,
-        'media_dir': config.USERBOT_MEDIA_DIR,
-        'storage_chat_id': storage_chat_id(),
-        'storage_channel_cfg': str(config.USERBOT_STORAGE_CHANNEL or ''),
         'backfill_limit': int(getattr(config, 'USERBOT_BACKFILL_LIMIT', 10) or 10),
+        'bot_username': str(config.USERBOT_BOT_USERNAME or 'avto_postmine_bot'),
         'recent_captures': len(history),
     }
 
 
 # ---------------------------------------------------------------------------
-# Медиа / перевод
+# Релей в основного бота (юзербот НЕ скачивает медиа — копирует посты в ЛС бота)
 # ---------------------------------------------------------------------------
-def _get_media_dir():
-    d = config.USERBOT_MEDIA_DIR
+def _bot_target():
+    """Куда пересылать посты: username/chat основного бота (@avto_postmine_bot)."""
+    uname = str(config.USERBOT_BOT_USERNAME or 'avto_postmine_bot').strip().lstrip('@')
+    return uname or 'avto_postmine_bot'
+
+
+def _ub_caption(orig_caption, source_url):
+    """Подпись с скрытым маркером для основного бота."""
+    return f"{orig_caption}\n\n{UB_MARKER}{source_url}"
+
+
+def _relay_to_bot(client, message, source_username):
+    """Пересылает одиночный пост в ЛС бота (server-side copy). Возвращает True/False."""
     try:
-        os.makedirs(d, exist_ok=True)
-    except Exception:
-        pass
-    return d
-
-
-# ---------------------------------------------------------------------------
-# Канал-хранилище (юзербот НЕ скачивает медиа — копирует посты сюда серверно)
-# ---------------------------------------------------------------------------
-def storage_chat_id():
-    """id канала-хранилища из глобальных настроек."""
-    v = database.get_global_setting('userbot_storage_chat_id', '')
-    try:
-        return int(v) if str(v).strip() else None
-    except Exception:
-        return None
-
-
-def _ensure_storage(client):
-    """Возвращает chat_id канала-хранилища. Если не задан — создаёт приватный канал
-    и добавляет бота администратором. Возвращает int chat_id или None."""
-    cfg = str(config.USERBOT_STORAGE_CHANNEL or '').strip()
-    if cfg:
-        try:
-            if cfg.lstrip('-').isdigit():
-                return int(cfg)
-            ch = client.get_chat(cfg)
-            return ch.id
-        except Exception as e:
-            print(f"⚠️ userbot: не удалось открыть USERBOT_STORAGE_CHANNEL {cfg}: {e}")
-            return None
-
-    cid = storage_chat_id()
-    if cid:
-        try:
-            client.get_chat(cid)
-            return cid
-        except Exception as e:
-            print(f"⚠️ userbot: хранилище {cid} недоступно ({e}) — попробую пересоздать")
-
-    try:
-        ch = client.create_channel(
-            title=config.USERBOT_STORAGE_TITLE,
-            about="Автоматическое хранилище захваченных постов юзербота.",
-        )
-        cid = ch.id
-        database.set_global_setting('userbot_storage_chat_id', str(cid))
-        print(f"✅ userbot: создан канал-хранилище id={cid}")
-        # Добавить бота администратором (по username или через username бота)
-        bot_username = config.USERBOT_BOT_USERNAME.strip().lstrip('@') or 'avto_postmine_bot'
-        try:
-            client.add_chat_members(cid, bot_username)
-            client.promote_chat_member(
-                cid, bot_username,
-                can_post_messages=True, can_edit_messages=True, can_delete_messages=True,
-                can_manage_video_chats=True, can_invite_users=True, can_pin_messages=True,
-            )
-            print(f"✅ userbot: бот @{bot_username} добавлен администратором в хранилище")
-        except Exception as e:
-            print(f"⚠️ userbot: не удалось добавить бота в хранилище: {e}")
-        return cid
+        target = _bot_target()
+        raw = (message.caption or message.text or "").strip()
+        source_url = f"https://t.me/{source_username.strip('@')}/{message.id}"
+        if message.photo or message.video or message.document:
+            client.copy_message(target, message.chat.id, message.id,
+                                caption=_ub_caption(raw, source_url))
+        elif raw:
+            client.send_message(target, _ub_caption(raw, source_url))
+        else:
+            return False
+        return True
     except Exception as e:
-        print(f"❌ userbot: не удалось создать канал-хранилище: {e}")
-        return None
+        print(f"❌ userbot: не удалось переслать пост {message.id} боту: {e}")
+        return False
 
 
-def _copy_to_storage(client, message):
-    """Копирует одиночное сообщение в канал-хранилище. Возвращает новое Message или None."""
-    cid = _ensure_storage(client)
-    if not cid:
-        return None
+def _relay_group_to_bot(client, messages, source_username):
+    """Пересылает media_group в ЛС бота. Возвращает True/False."""
     try:
-        return client.copy_message(cid, message.chat.id, message.id)
-    except Exception as e:
-        print(f"⚠️ userbot: не удалось скопировать пост {message.id} в хранилище: {e}")
-        return None
-
-
-def _copy_group_to_storage(client, messages):
-    """Копирует media_group в канал-хранилище. Возвращает список новых Message или []."""
-    cid = _ensure_storage(client)
-    if not cid:
-        return []
-    try:
+        target = _bot_target()
         first = messages[0]
-        return list(client.copy_media_group(cid, first.chat.id, first.id) or [])
+        source_url = f"https://t.me/{source_username.strip('@')}/{first.id}"
+        # Подписи: все элементы группы, но маркер добавляем в первую подпись.
+        captions = []
+        for m in messages:
+            cap = (m.caption or "").strip()
+            if m.id == first.id and cap:
+                cap = _ub_caption(cap, source_url)
+            elif m.id == first.id:
+                cap = f"\n\n{UB_MARKER}{source_url}"
+            captions.append(cap)
+        client.copy_media_group(target, first.chat.id, first.id, captions=captions)
+        return True
     except Exception as e:
-        print(f"⚠️ userbot: не удалось скопировать альбом в хранилище: {e}")
-        return []
+        print(f"❌ userbot: не удалось переслать альбом боту: {e}")
+        return False
 
 
-def _st_ref(msg):
-    """Возвращает media-ссылку формата st:<chat_id>:<msg_id> для сообщения в хранилище."""
-    try:
-        return f"st:{msg.chat.id}:{msg.id}"
-    except Exception:
-        return None
-
-
-def _translate(text):
-    """Перевод текста поста на узбекский (только если текст непустой)."""
-    if not text or not text.strip():
-        return ""
-    try:
-        return ai_generator.translate_post(text, "uz") or ""
-    except Exception as e:
-        print(f"⚠️ userbot: ошибка перевода: {e}")
-        return ""
-
-
-def _existing_post_id(source_url):
-    """Если такой source_url уже сохранён (дубликат) — вернуть его id."""
-    try:
-        dups = content_storage.find_duplicates(source_url=source_url)
-        return dups[0][0] if dups else None
-    except Exception:
-        return None
-
-
-def _log_captured(post_id, source_username, message_id, text):
+def _log_relayed(source_username, message_id, ok):
+    status = 'captured' if ok else 'skipped'
     scheduler_engine.log_event('userbot_captured',
-                               f"Captured post #{post_id} from {source_username} (msg {message_id})",
-                               data=(text or '')[:200])
-    database.audit_log('userbot_captured', f"post:{post_id}", new_value=f"{source_username} msg:{message_id}")
-    print(f"✅ userbot: пост #{post_id} из {source_username} (msg {message_id}) сохранён")
+                               f"Relayed {source_username} msg {message_id} to bot ({status})",
+                               data=status)
+    database.audit_log('userbot_captured', f"msg:{message_id}", new_value=f"{source_username} {status}")
+    print(f"{'✅' if ok else '⚠️'} userbot: {source_username} msg {message_id} → бот ({status})")
 
 
 # ---------------------------------------------------------------------------
 # Захват одного поста (фото / видео / документ / текст)
 # ---------------------------------------------------------------------------
 def capture_message(client, message, source_username):
-    """Обработка одного сообщения (не альбом). Возвращает post_id (или id дубликата) или None.
+    """Обработка одного сообщения (не альбом). Возвращает True/False (релей удался?).
 
-    Медиа НЕ скачивается: пост копируется в канал-хранилище (server-side copy),
-    media сохраняется как 'st:<chat_id>:<msg_id>'. При публикации бот делает copy_message.
+    Медиа НЕ скачивается: пост пересылается (server-side copy) в ЛС основного бота
+    со скрытым маркером __UBR__:<source_url> в подписи. Бот сам переведёт текст,
+    сохранит пост в Content Storage и поставит в умную очередь.
     """
     try:
         raw_text = (message.caption or message.text or "").strip()
-        uz_text = _translate(raw_text)
-
-        media_refs = []
-        media_type = 'text'
-
-        if message.photo:
-            media_type = 'photo'
-            new_m = _copy_to_storage(client, message)
-            if new_m:
-                media_refs.append(_st_ref(new_m))
-        elif message.video:
-            media_type = 'video'
-            new_m = _copy_to_storage(client, message)
-            if new_m:
-                media_refs.append(_st_ref(new_m))
-        elif message.document:
-            media_type = 'document'
-            new_m = _copy_to_storage(client, message)
-            if new_m:
-                media_refs.append(_st_ref(new_m))
-
-        if media_type == 'text' and not raw_text:
-            return None
-
-        source_url = f"https://t.me/{source_username.strip('@')}/{message.id}"
-        post_id, dup = content_storage.create_post(
-            text=uz_text or raw_text or "",
-            media=",".join(media_refs),
-            media_type=media_type,
-            caption="",
-            title="",
-            source="userbot",
-            source_url=source_url,
-            original_message_id=str(message.id),
-            original_channel_id=str(message.chat.id),
-            category="",
-            language="uz",
-            tags="",
-            priority=5,
-            status='available',
-            duplicate_check=True,
-            check_anyway=False,
-        )
-        if post_id is None:
-            post_id = _existing_post_id(source_url)
-        if post_id:
-            _log_captured(post_id, source_username, message.id, uz_text or raw_text)
-        else:
-            print(f"⚠️ userbot: пустой/дубликат {source_username} msg {message.id}")
-        return post_id
+        if message.photo or message.video or message.document:
+            pass
+        elif not raw_text:
+            return False
+        ok = _relay_to_bot(client, message, source_username)
+        _log_relayed(source_username, message.id, ok)
+        return ok
     except Exception as e:
         print(f"❌ userbot: ошибка обработки сообщения {message.id}: {e}")
-        return None
+        return False
 
 
 # ---------------------------------------------------------------------------
-# Захват альбома (media_group) — все фото/видео в ОДИН пост
+# Захват альбома (media_group) — пересылка всей группы в бота
 # ---------------------------------------------------------------------------
 def capture_album(client, messages, source_username):
-    """Обрабатывает список сообщений одной media_group как один пост.
-
-    Альбом копируется в канал-хранилище через copy_media_group (без скачивания),
-    media = 'st:<chat_id>:<msg_id>' для каждого элемента группы.
-    """
+    """Пересылает media_group в ЛС бота одним copy_media_group. Возвращает True/False."""
     try:
         members = [m for m in messages if m.photo or m.video]
         if not members:
-            return None
-        raw_text = ""
-        for m in members:
-            if getattr(m, 'caption', None):
-                raw_text = m.caption.strip()
-                break
-        uz_text = _translate(raw_text)
-
-        media_refs = []
-        copied = _copy_group_to_storage(client, members)
-        for m in copied:
-            ref = _st_ref(m)
-            if ref:
-                media_refs.append(ref)
-        if not media_refs and not uz_text:
-            return None
-
-        first = members[0]
-        source_url = f"https://t.me/{source_username.strip('@')}/{first.id}"
-        post_id, dup = content_storage.create_post(
-            text=uz_text or raw_text or "",
-            media=",".join(media_refs),
-            media_type='album',
-            caption="",
-            title="",
-            source="userbot",
-            source_url=source_url,
-            original_message_id=str(first.id),
-            original_channel_id=str(first.chat.id),
-            category="",
-            language="uz",
-            tags="",
-            priority=5,
-            status='available',
-            duplicate_check=True,
-            check_anyway=False,
-        )
-        if post_id is None:
-            post_id = _existing_post_id(source_url)
-        if post_id:
-            _log_captured(post_id, source_username, first.id, uz_text or raw_text)
-        return post_id
+            return False
+        ok = _relay_group_to_bot(client, members, source_username)
+        _log_relayed(source_username, members[0].id, ok)
+        return ok
     except Exception as e:
         print(f"❌ userbot: ошибка обработки альбома: {e}")
-        return None
+        return False
 
 
 def _process_message(client, message, source_username):
@@ -340,7 +187,7 @@ def _process_message(client, message, source_username):
 
 
 def _process_album(client, message, source_username):
-    """Собирает все члены media_group и захватывает одним постом."""
+    """Собирает все члены media_group и пересылает одним релеем."""
     gid = message.media_group_id
     with _album_lock:
         if gid in _active_groups:
@@ -356,15 +203,15 @@ def _process_album(client, message, source_username):
             return None
         if any(database.userbot_history_exists(source_username, m.id) for m in members):
             return None
-        post_id = capture_album(client, members, source_username)
+        ok = capture_album(client, members, source_username)
         # фиксируем ВСЕ члены группы в истории, чтобы другие фото не создали дубли
         for m in members:
-            database.userbot_history_add(source_username, m.id, gid, post_id, status='captured' if post_id else 'skipped')
+            database.userbot_history_add(source_username, m.id, gid, None, status='captured' if ok else 'skipped')
         max_id = max(m.id for m in members)
         last = database.userbot_get_last_message(source_username)
         if max_id > last:
             database.userbot_set_last_message(source_username, max_id)
-        return post_id
+        return ok
     finally:
         with _album_lock:
             _active_groups.discard(gid)
@@ -450,11 +297,11 @@ def _run():
                 # антиповтор: уже перехваченное сообщение не трогаем
                 if database.userbot_history_exists(f"@{uname}", message.id):
                     return
-                post_id = _process_message(client, message, f"@{uname}")
+                ok = _process_message(client, message, f"@{uname}")
                 # для одиночных сообщений фиксируем историю + last_message_id
                 if not getattr(message, 'media_group_id', None):
                     database.userbot_history_add(f"@{uname}", message.id, "",
-                                                 post_id, status='captured' if post_id else 'skipped')
+                                                 None, status='captured' if ok else 'skipped')
                     last = database.userbot_get_last_message(f"@{uname}")
                     if message.id > last:
                         database.userbot_set_last_message(f"@{uname}", message.id)
@@ -467,12 +314,6 @@ def _run():
         # start() в Pyrogram синхронный: вызываем его напрямую,
         # затем держим event loop живым через run_forever.
         _ub.start()
-
-        # Канал-хранилище (создаётся при первом запуске)
-        try:
-            _ensure_storage(_ub)
-        except Exception as e:
-            print(f"⚠️ userbot: хранилище не инициализировано: {e}")
 
         # Бэкфилл пропущенных постов (после подключения, до run_forever)
         try:

@@ -222,6 +222,18 @@ class TestPlatformAPI(unittest.TestCase):
         self.assertEqual(photos, ['st:-100:1'])
         self.assertEqual(docs, ['file.jar'])
 
+    def test_userbot_relay_marker(self):
+        import handlers
+        clean, src = handlers._extract_ub_marker("Some text\n\n__UBR__:https://t.me/ch/5")
+        self.assertEqual(clean, "Some text")
+        self.assertEqual(src, "https://t.me/ch/5")
+        clean, src = handlers._extract_ub_marker("Plain caption")
+        self.assertEqual(clean, "Plain caption")
+        self.assertIsNone(src)
+        clean, src = handlers._extract_ub_marker("\n\n__UBR__:https://t.me/ch/9")
+        self.assertEqual(clean, "")
+        self.assertEqual(src, "https://t.me/ch/9")
+
 
 if __name__ == '__main__':
     unittest.main()
