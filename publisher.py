@@ -16,7 +16,8 @@ def _open_media(item):
     return item
 
 def _split_media(media_str):
-    """Разбивает строку media на (фото/видео пути, документы). Документы имеют префикс doc:."""
+    """Разбивает строку media на (фото/видео пути, документы). Документы имеют префикс doc:,
+    storage-ссылки имеют префикс st:."""
     photos, docs = [], []
     for part in str(media_str or '').split(','):
         part = part.strip()
@@ -27,6 +28,27 @@ def _split_media(media_str):
         else:
             photos.append(part)
     return photos, docs
+
+
+def _parse_st_ref(item):
+    """Парсит storage-ссылку 'st:<chat_id>:<msg_id>' → (chat_id, msg_id) или None."""
+    s = str(item or '').strip()
+    if not s.startswith('st:'):
+        return None
+    parts = s.split(':')
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[1]), int(parts[2])
+    except Exception:
+        return None
+
+
+def _is_storage_media(media_str):
+    """True, если media — полностью storage-ссылки (не локальные файлы)."""
+    parts = [p.strip() for p in str(media_str or '').split(',') if p.strip()]
+    return bool(parts) and all(_parse_st_ref(p) for p in parts)
+
 
 _VIDEO_EXT = ('.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v')
 
@@ -51,6 +73,45 @@ def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_
             sq_text = database.get_global_setting('smart_queue_text', '')
             if sq_text and sq_text not in text:
                 text += f"\n\n{sq_text}"
+
+        # 1a. Storage-режим: медиа лежит в канале-хранилище — копируем серверно (без скачивания)
+        if photo_id and _is_storage_media(photo_id):
+            refs = [(_parse_st_ref(p)) for p in str(photo_id).split(',') if p.strip()]
+            refs = [r for r in refs if r]
+            if refs:
+                caption = text if len(text) <= 1024 else None
+                if len(refs) == 1:
+                    chat_from, msg_id = refs[0]
+                    sent_message = bot.copy_message(channel_id, chat_from, msg_id,
+                                                    caption=caption, parse_mode='HTML')
+                else:
+                    from_chat = refs[0][0]
+                    ids = [m for _, m in refs]
+                    copied = bot.copy_messages(channel_id, from_chat, ids, remove_caption=True)
+                    sent_message = copied[0] if copied else None
+                    # Альбом не поддерживает перезапись caption через copy_messages —
+                    # отправляем переведённый текст отдельным сообщением.
+                    if text and len(text) <= 1024 and copied:
+                        bot.send_message(channel_id, text, parse_mode='HTML')
+                # Если текст длиннее 1024 — отправляем отдельным сообщением
+                if len(text) > 1024:
+                    bot.send_message(channel_id, text, parse_mode='HTML')
+                # Документы/прочие storage-ссылки в document_id не ожидаются
+                for admin in getattr(config, 'ADMIN_IDS', []):
+                    try:
+                        post_title = text.split('\n')[0].replace('📦 ', '')[:50]
+                        msg = f"✅ <b>Пост опубликован:</b>\nМод: {post_title}\nКанал: {channel_id}\nВремя: {time.strftime('%H:%M:%S', time.localtime())}"
+                        if is_auto:
+                            msg = f"✅ <b>Автопостинг:</b> Мод <i>{post_title}</i> успешно опубликован в {channel_id} в {time.strftime('%H:%M:%S', time.localtime())}!"
+                        bot.send_message(admin, msg, parse_mode='HTML')
+                    except Exception:
+                        pass
+                if post_id != -1:
+                    database.mark_as_posted(post_id)
+                    if sent_message:
+                        database.update_message_id(post_id, sent_message.message_id)
+                print(f"✅ Пост #{post_id} опубликован в {channel_id} (storage-copy)!")
+                return True
 
         # 1. Отправка медиа
         sent_message = None

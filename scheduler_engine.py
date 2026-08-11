@@ -278,7 +278,7 @@ def _publish(bot, post_id, username, post, scheduled_at):
         media = post.get('media') or ''
         media_type = post.get('media_type') or 'text'
         photos, docs = publisher._split_media(media)
-        media_arg = ",".join(photos) if media_type in ('photo', 'album', 'video') else None
+        media_arg = ",".join(photos) if media_type in ('photo', 'album', 'video', 'document') else None
         doc_arg = ",".join(docs) if docs else None
         ok = publisher.publish_post_data(bot, -1, media_arg,
                                          text, doc_arg, username, is_auto=True,

@@ -212,6 +212,16 @@ class TestPlatformAPI(unittest.TestCase):
         self.assertEqual(len(d['items']), 1)
         self.assertEqual(d['items'][0]['message_id'], 100)
 
+    def test_publisher_storage_helpers(self):
+        import publisher
+        self.assertEqual(publisher._parse_st_ref('st:-100123:42'), (-100123, 42))
+        self.assertIsNone(publisher._parse_st_ref('photo.jpg'))
+        self.assertTrue(publisher._is_storage_media('st:-100:1,st:-100:2'))
+        self.assertFalse(publisher._is_storage_media('st:-100:1,photo.jpg'))
+        photos, docs = publisher._split_media('st:-100:1,doc:file.jar')
+        self.assertEqual(photos, ['st:-100:1'])
+        self.assertEqual(docs, ['file.jar'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -41,6 +41,15 @@ opencode сразу знал контекст.
 
 ## Последние фиксы (сделаны)
 
+0. **USERBOT: канал-хранилище вместо скачивания (2026-08-11)**:
+   - **Проблема**: юзербот качал медиа на диск → OOM при больших файлах (.mcaddon и т.п.) на деплое.
+   - **Решение**: юзербот больше НЕ скачивает файлы. При старте создаёт приватный канал-хранилище (`client.create_channel` из `USERBOT_STORAGE_TITLE`, id в `global_settings['userbot_storage_chat_id']`), добавляет бота админом (`USERBOT_BOT_USERNAME`, дефолт `avto_postmine_bot`). Готовый канал можно задать вручную через `USERBOT_STORAGE_CHANNEL`.
+   - **Захват**: `capture_message`/`capture_album` копируют пост в хранилище `client.copy_message`/`copy_media_group` (server-side, без скачивания). media сохраняется как `st:<chat_id>:<msg_id>` (по одному на элемент альбома).
+   - **Публикация**: `publisher._parse_st_ref`/`_is_storage_media` распознают `st:` ссылки; `publish_post_data` копирует из хранилища через `bot.copy_message` (одиночное) / `bot.copy_messages(remove_caption=True)` + отдельный текст (альбом). Никакого file_id юзербота (он несовместим с ботом) и никаких локальных файлов.
+   - `scheduler_engine._publish`: `media_type='document'` тоже передаёт media_arg (в storage-режиме документы хранятся как `st:` ссылки).
+   - `status()` панели: добавлены `storage_chat_id`/`storage_channel_cfg`.
+   - **Тесты**: 66 OK (добавлен `test_publisher_storage_helpers`).
+
 0. **USERBOT: история захвата + альбомы + видео (2026-08-11)**:
    - **Таблица `userbot_history`** (database.py): каждая перехваченная message_id фиксируется (антиповтор) — функции `userbot_history_add`/`exists`/`get`/`list`. `userbot.py` теперь использует её вместо `last_message_id` (двойная защита), логирует `status='captured'`/`'skipped'`/`'error'`.
    - **Альбомы**: все фото/видео одной `media_group_id` объединяются в ОДИН пост (`media_type=album`, media = пути через запятую). Роутинг в `capture_message`: есть `media_group_id` → собрать группу через `client.get_media_group` и `capture_album`.

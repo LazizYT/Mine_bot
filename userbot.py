@@ -65,6 +65,8 @@ def status():
         'has_session_file': os.path.exists(config.USERBOT_SESSION_FILE),
         'session_file': config.USERBOT_SESSION_FILE,
         'media_dir': config.USERBOT_MEDIA_DIR,
+        'storage_chat_id': storage_chat_id(),
+        'storage_channel_cfg': str(config.USERBOT_STORAGE_CHANNEL or ''),
         'backfill_limit': int(getattr(config, 'USERBOT_BACKFILL_LIMIT', 10) or 10),
         'recent_captures': len(history),
     }
@@ -82,6 +84,99 @@ def _get_media_dir():
     return d
 
 
+# ---------------------------------------------------------------------------
+# Канал-хранилище (юзербот НЕ скачивает медиа — копирует посты сюда серверно)
+# ---------------------------------------------------------------------------
+def storage_chat_id():
+    """id канала-хранилища из глобальных настроек."""
+    v = database.get_global_setting('userbot_storage_chat_id', '')
+    try:
+        return int(v) if str(v).strip() else None
+    except Exception:
+        return None
+
+
+def _ensure_storage(client):
+    """Возвращает chat_id канала-хранилища. Если не задан — создаёт приватный канал
+    и добавляет бота администратором. Возвращает int chat_id или None."""
+    cfg = str(config.USERBOT_STORAGE_CHANNEL or '').strip()
+    if cfg:
+        try:
+            if cfg.lstrip('-').isdigit():
+                return int(cfg)
+            ch = client.get_chat(cfg)
+            return ch.id
+        except Exception as e:
+            print(f"⚠️ userbot: не удалось открыть USERBOT_STORAGE_CHANNEL {cfg}: {e}")
+            return None
+
+    cid = storage_chat_id()
+    if cid:
+        try:
+            client.get_chat(cid)
+            return cid
+        except Exception as e:
+            print(f"⚠️ userbot: хранилище {cid} недоступно ({e}) — попробую пересоздать")
+
+    try:
+        ch = client.create_channel(
+            title=config.USERBOT_STORAGE_TITLE,
+            about="Автоматическое хранилище захваченных постов юзербота.",
+        )
+        cid = ch.id
+        database.set_global_setting('userbot_storage_chat_id', str(cid))
+        print(f"✅ userbot: создан канал-хранилище id={cid}")
+        # Добавить бота администратором (по username или через username бота)
+        bot_username = config.USERBOT_BOT_USERNAME.strip().lstrip('@') or 'avto_postmine_bot'
+        try:
+            client.add_chat_members(cid, bot_username)
+            client.promote_chat_member(
+                cid, bot_username,
+                can_post_messages=True, can_edit_messages=True, can_delete_messages=True,
+                can_manage_video_chats=True, can_invite_users=True, can_pin_messages=True,
+            )
+            print(f"✅ userbot: бот @{bot_username} добавлен администратором в хранилище")
+        except Exception as e:
+            print(f"⚠️ userbot: не удалось добавить бота в хранилище: {e}")
+        return cid
+    except Exception as e:
+        print(f"❌ userbot: не удалось создать канал-хранилище: {e}")
+        return None
+
+
+def _copy_to_storage(client, message):
+    """Копирует одиночное сообщение в канал-хранилище. Возвращает новое Message или None."""
+    cid = _ensure_storage(client)
+    if not cid:
+        return None
+    try:
+        return client.copy_message(cid, message.chat.id, message.id)
+    except Exception as e:
+        print(f"⚠️ userbot: не удалось скопировать пост {message.id} в хранилище: {e}")
+        return None
+
+
+def _copy_group_to_storage(client, messages):
+    """Копирует media_group в канал-хранилище. Возвращает список новых Message или []."""
+    cid = _ensure_storage(client)
+    if not cid:
+        return []
+    try:
+        first = messages[0]
+        return list(client.copy_media_group(cid, first.chat.id, first.id) or [])
+    except Exception as e:
+        print(f"⚠️ userbot: не удалось скопировать альбом в хранилище: {e}")
+        return []
+
+
+def _st_ref(msg):
+    """Возвращает media-ссылку формата st:<chat_id>:<msg_id> для сообщения в хранилище."""
+    try:
+        return f"st:{msg.chat.id}:{msg.id}"
+    except Exception:
+        return None
+
+
 def _translate(text):
     """Перевод текста поста на узбекский (только если текст непустой)."""
     if not text or not text.strip():
@@ -91,17 +186,6 @@ def _translate(text):
     except Exception as e:
         print(f"⚠️ userbot: ошибка перевода: {e}")
         return ""
-
-
-def _download(client, media, prefix, source_username, message_id, ext):
-    """Скачивает медиа в папку userbot. Возвращает путь или None."""
-    fp = os.path.join(_get_media_dir(), f"{prefix}_{source_username.strip('@')}_{message_id}.{ext}")
-    try:
-        client.download_media(media, file_name=fp)
-        return fp if os.path.exists(fp) else None
-    except Exception as e:
-        print(f"⚠️ userbot: не удалось скачать {prefix} {message_id}: {e}")
-        return None
 
 
 def _existing_post_id(source_url):
@@ -125,37 +209,33 @@ def _log_captured(post_id, source_username, message_id, text):
 # Захват одного поста (фото / видео / документ / текст)
 # ---------------------------------------------------------------------------
 def capture_message(client, message, source_username):
-    """Обработка одного сообщения (не альбом). Возвращает post_id (или id дубликата) или None."""
+    """Обработка одного сообщения (не альбом). Возвращает post_id (или id дубликата) или None.
+
+    Медиа НЕ скачивается: пост копируется в канал-хранилище (server-side copy),
+    media сохраняется как 'st:<chat_id>:<msg_id>'. При публикации бот делает copy_message.
+    """
     try:
         raw_text = (message.caption or message.text or "").strip()
         uz_text = _translate(raw_text)
 
-        media_paths = []
-        file_path = None
+        media_refs = []
         media_type = 'text'
 
         if message.photo:
             media_type = 'photo'
-            p = _download(client, message.photo, 'ph', source_username, message.id, 'jpg')
-            if p:
-                media_paths.append(p)
+            new_m = _copy_to_storage(client, message)
+            if new_m:
+                media_refs.append(_st_ref(new_m))
         elif message.video:
             media_type = 'video'
-            p = _download(client, message.video, 'vid', source_username, message.id, 'mp4')
-            if p:
-                media_paths.append(p)
+            new_m = _copy_to_storage(client, message)
+            if new_m:
+                media_refs.append(_st_ref(new_m))
         elif message.document:
             media_type = 'document'
-            fname = getattr(message.document, 'file_name', None) or f"file_{message.id}"
-            safe_name = os.path.basename(fname)
-            file_path = os.path.join(_get_media_dir(), f"doc_{source_username.strip('@')}_{message.id}_{safe_name}")
-            try:
-                client.download_media(message.document, file_name=file_path)
-                if not os.path.exists(file_path):
-                    file_path = None
-            except Exception as e:
-                print(f"⚠️ userbot: не удалось скачать документ {message.id}: {e}")
-                file_path = None
+            new_m = _copy_to_storage(client, message)
+            if new_m:
+                media_refs.append(_st_ref(new_m))
 
         if media_type == 'text' and not raw_text:
             return None
@@ -163,7 +243,7 @@ def capture_message(client, message, source_username):
         source_url = f"https://t.me/{source_username.strip('@')}/{message.id}"
         post_id, dup = content_storage.create_post(
             text=uz_text or raw_text or "",
-            media=",".join(media_paths),
+            media=",".join(media_refs),
             media_type=media_type,
             caption="",
             title="",
@@ -181,10 +261,6 @@ def capture_message(client, message, source_username):
         )
         if post_id is None:
             post_id = _existing_post_id(source_url)
-        if post_id and file_path:
-            media_full = (content_storage.get_post(post_id) or {}).get('media', '')
-            media_full = f"{media_full},doc:{file_path}" if media_full else f"doc:{file_path}"
-            content_storage.update_post(post_id, media=media_full)
         if post_id:
             _log_captured(post_id, source_username, message.id, uz_text or raw_text)
         else:
@@ -199,7 +275,11 @@ def capture_message(client, message, source_username):
 # Захват альбома (media_group) — все фото/видео в ОДИН пост
 # ---------------------------------------------------------------------------
 def capture_album(client, messages, source_username):
-    """Обрабатывает список сообщений одной media_group как один пост."""
+    """Обрабатывает список сообщений одной media_group как один пост.
+
+    Альбом копируется в канал-хранилище через copy_media_group (без скачивания),
+    media = 'st:<chat_id>:<msg_id>' для каждого элемента группы.
+    """
     try:
         members = [m for m in messages if m.photo or m.video]
         if not members:
@@ -211,24 +291,20 @@ def capture_album(client, messages, source_username):
                 break
         uz_text = _translate(raw_text)
 
-        media_paths = []
-        for m in members:
-            if m.photo:
-                p = _download(client, m.photo, 'ph', source_username, m.id, 'jpg')
-            elif m.video:
-                p = _download(client, m.video, 'vid', source_username, m.id, 'mp4')
-            else:
-                p = None
-            if p:
-                media_paths.append(p)
-        if not media_paths and not uz_text:
+        media_refs = []
+        copied = _copy_group_to_storage(client, members)
+        for m in copied:
+            ref = _st_ref(m)
+            if ref:
+                media_refs.append(ref)
+        if not media_refs and not uz_text:
             return None
 
         first = members[0]
         source_url = f"https://t.me/{source_username.strip('@')}/{first.id}"
         post_id, dup = content_storage.create_post(
             text=uz_text or raw_text or "",
-            media=",".join(media_paths),
+            media=",".join(media_refs),
             media_type='album',
             caption="",
             title="",
@@ -391,6 +467,12 @@ def _run():
         # start() в Pyrogram синхронный: вызываем его напрямую,
         # затем держим event loop живым через run_forever.
         _ub.start()
+
+        # Канал-хранилище (создаётся при первом запуске)
+        try:
+            _ensure_storage(_ub)
+        except Exception as e:
+            print(f"⚠️ userbot: хранилище не инициализировано: {e}")
 
         # Бэкфилл пропущенных постов (после подключения, до run_forever)
         try:
