@@ -234,6 +234,19 @@
             background: var(--cyan); box-shadow: 0 0 10px var(--cyan);
         }
         h6 { letter-spacing: 0.05em; }
+        .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background: #223044; transition: .3s; border-radius: 6px;
+            border: 1px solid var(--line-strong);
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+            background: #8ea0b5; transition: .3s; border-radius: 4px;
+        }
+        input:checked + .slider { background: rgba(34,211,238,0.28); border-color: var(--cyan); box-shadow: 0 0 10px rgba(34,211,238,0.35); }
+        input:checked + .slider:before { transform: translateX(22px); background: var(--cyan); }
     </style>
 </head>
 <body>
@@ -261,6 +274,7 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#memory" id="tab-memory" onclick="loadMemory()">Xotira</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#audience" id="tab-audience" onclick="loadComments()">Auditoriya</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#analytics" id="tab-analytics">Kanallar</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#userbot" id="tab-userbot" onclick="loadUserbot()">Userbot</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#settings" id="tab-settings">Sozlamalar</button></li>
     </ul>
 
@@ -500,10 +514,43 @@
                 </div>
             </div>
         </div>
+        <div class="tab-pane fade" id="userbot">
+            <div class="row" id="userbot-stats"></div>
+            <div class="card p-4 mt-2">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                    <h6 class="section-title mb-0">USERBOT SOURCES</h6>
+                    <div class="ms-auto d-flex gap-2">
+                        <input class="form-control form-control-sm" id="ub-source-input" placeholder="@channel_username" style="width:180px;">
+                        <button class="btn btn-primary-mc btn-mc btn-sm" onclick="addUserbotSource()">+ ADD SOURCE</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover" style="font-size: 0.68rem;">
+                        <thead>
+                            <tr><th>CHANNEL</th><th>ENABLED</th><th>LAST MSG</th><th>ACTION</th></tr>
+                        </thead>
+                        <tbody id="userbot-sources-table"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card p-4 mt-2">
+                <div class="d-flex align-items-center mb-3">
+                    <h6 class="section-title mb-0">CAPTURE HISTORY</h6>
+                    <button class="btn btn-sm btn-purple-mc btn-mc ms-auto" onclick="loadUserbotHistory()">REFRESH</button>
+                </div>
+                <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                    <table class="table table-hover" style="font-size: 0.68rem;">
+                        <thead>
+                            <tr><th>POST</th><th>SOURCE</th><th>MSG</th><th>GROUP</th><th>STATUS</th><th>TIME</th></tr>
+                        </thead>
+                        <tbody id="userbot-history-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
-
-<div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header border-secondary">
@@ -723,6 +770,87 @@
     }
 
     function setLang(l) { fetch('/api/settings/language', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({lang: l}) }).then(() => location.reload()); }
+
+    async function ubApi(url, method='GET', body=null) {
+        const opt = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) opt.body = JSON.stringify(body);
+        const r = await fetch(url, opt);
+        return r.json();
+    }
+
+    async function loadUserbot() {
+        const [st, src] = await Promise.all([
+            ubApi('/api/platform/userbot/status'),
+            ubApi('/api/platform/userbot/sources'),
+        ]);
+        const stats = document.getElementById('userbot-stats');
+        if (!stats) return;
+        const conf = st.configured ? 'CONFIGURED' : 'NOT CONFIGURED';
+        const run = st.running ? 'RUNNING' : (st.enabled ? 'DISABLED (no api_id/session)' : 'ENABLED=OFF');
+        stats.innerHTML = `
+            <div class="col-md-4"><div class="card stats-card p-3"><div class="stats-num">${st.enabled ? 'YES' : 'NO'}</div><div class="stats-label">ENABLED</div></div></div>
+            <div class="col-md-4"><div class="card stats-card p-3"><div class="stats-num" style="color:var(--neon-g)">${conf}</div><div class="stats-label">CONFIGURED</div></div></div>
+            <div class="col-md-4"><div class="card stats-card p-3"><div class="stats-num" style="color:var(--cyan)">${run}</div><div class="stats-label">STATUS</div></div></div>`;
+        const tbody = document.getElementById('userbot-sources-table');
+        tbody.innerHTML = '';
+        if (!src.items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-white-50">NO SOURCES — ADD A CHANNEL ABOVE</td></tr>';
+        } else {
+            src.items.forEach(s => {
+                tbody.insertAdjacentHTML('beforeend', `
+                <tr>
+                    <td style="color:var(--text)">${s.username}</td>
+                    <td>
+                        <label class="switch"><input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleUserbotSource('${s.username}', this.checked)"><span class="slider"></span></label>
+                    </td>
+                    <td style="color:var(--text)">${s.last_message_id || 0}</td>
+                    <td><button class="btn btn-sm btn-danger-mc btn-mc" onclick="deleteUserbotSource('${s.username}')">DELETE</button></td>
+                </tr>`);
+            });
+        }
+        loadUserbotHistory();
+    }
+
+    async function addUserbotSource() {
+        const input = document.getElementById('ub-source-input');
+        const username = input.value.trim();
+        if (!username) return;
+        const d = await ubApi('/api/platform/userbot/sources', 'POST', { username });
+        if (d.status === 'success') { input.value = ''; loadUserbot(); }
+    }
+
+    async function deleteUserbotSource(username) {
+        if (!confirm('Delete source ' + username + '?')) return;
+        await ubApi('/api/platform/userbot/sources/' + encodeURIComponent(username), 'DELETE');
+        loadUserbot();
+    }
+
+    async function toggleUserbotSource(username, enabled) {
+        await ubApi('/api/platform/userbot/sources/' + encodeURIComponent(username) + '/toggle', 'POST', { enabled: enabled ? 1 : 0 });
+    }
+
+    async function loadUserbotHistory() {
+        const d = await ubApi('/api/platform/userbot/history?limit=100');
+        const tbody = document.getElementById('userbot-history-table');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!d.items.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-white-50">NO CAPTURES YET</td></tr>';
+            return;
+        }
+        d.items.forEach(h => {
+            tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+                <td>${h.post_id ? '#' + h.post_id : '—'}</td>
+                <td style="color:var(--text)">${h.source_username}</td>
+                <td style="color:var(--text)">${h.message_id}</td>
+                <td>${h.media_group_id ? h.media_group_id.slice(0, 8) + '…' : '—'}</td>
+                <td><span class="badge bg-dark border border-secondary">${h.status}</span></td>
+                <td class="text-success">${h.created_at ? new Date(h.created_at * 1000).toLocaleString() : '—'}</td>
+            </tr>`);
+        });
+    }
+
     function viewFullText(id) { fetch('/api/post/' + id).then(r => r.json()).then(p => { document.getElementById('full-text-content').innerText = p.text; new bootstrap.Modal(document.getElementById('textModal')).show(); }); }
     let curId = null;
     function editPost(id) { 

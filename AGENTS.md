@@ -47,6 +47,7 @@ opencode сразу знал контекст.
    - **Бэкфилл пропущенных**: `backfill(client, source)` — при старте вычитывает историю канала от `last_message_id`, захватывает пропущенные (лимит `USERBOT_BACKFILL_LIMIT`, дефолт 10).
    - **Видео в паблишинге**: `publisher.publish_post_data` получил `media_type` ('photo'/'album'/'video'/'text'/'document'), одиночное видео → `send_video`, альбомы со смешанным типом определяют `InputMediaVideo`/`InputMediaPhoto` по расширению файла (`_is_video`, mp4/webm/mov/mkv/avi/m4v). `scheduler_engine._publish` передаёт `media_type`.
    - **Панель**: секция CAPTURE HISTORY в `/platform` (последние 100, столбцы POST/SOURCE/MSG/GROUP/STATUS/TIME), API `/api/platform/userbot/history?limit=&source=`, грузится при открытии вкладки USERBOT.
+   - **Вкладка USERBOT на главном дашборде** (`dashboard.html`, открывается из кнопки Studio): карточки ENABLED/CONFIGURED/STATUS + таблица источников (add/delete/toggle через switch) + таблица CAPTURE HISTORY (100 последних). JS: `ubApi`/`loadUserbot`/`addUserbotSource`/`deleteUserbotSource`/`toggleUserbotSource`/`loadUserbotHistory`. Добавлен CSS `.switch`/`.slider`.
    - **Тесты**: 65 OK (добавлен `test_userbot_history_api`).
 
 0. **ХАРДЕНИНГ + РЕФАКТОРИНГ (2026-08-11)**:
