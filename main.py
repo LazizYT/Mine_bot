@@ -5,6 +5,7 @@ import threading
 import config
 import database
 import publisher
+import scheduler_engine
 import handlers
 import webapp
 from bot_instance import bot
@@ -19,13 +20,15 @@ album_cache = {}
 # Регистрация всех обработчиков из модуля handlers
 handlers.register_handlers(bot, user_drafts, album_cache)
 
-# Настройка планировщика для очереди постов
+# Настройка планировщика: основной движок автопубликации
 scheduler = BackgroundScheduler()
-scheduler.add_job(publisher.process_queue, 'interval', minutes=1, args=[bot])
+scheduler.add_job(scheduler_engine.run_scheduler, 'interval', minutes=1, args=[bot])
 # Автоматический опрос предложений каждые 3 дня
 scheduler.add_job(publisher.auto_ask_suggestions, 'interval', days=3, args=[bot])
 # Мониторинг оттока подписчиков каждые 6 часов
 scheduler.add_job(publisher.check_subscriber_drop, 'interval', hours=6, args=[bot])
+# Ретраи упавших публикаций
+scheduler.add_job(scheduler_engine.retry_failed, 'interval', minutes=30, args=[bot])
 scheduler.start()
 
 # Запуск Web Dashboard в отдельном потоке

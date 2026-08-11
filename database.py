@@ -9,6 +9,10 @@ from datetime import datetime, timedelta
 # чтобы данные сохранялись на Volume при перезагрузках.
 DB_PATH = os.getenv('DB_PATH', os.path.join('data', 'bot_data.db'))
 
+def _connect():
+    """Утилита: открыть соединение с БД (используется сервисными модулями)."""
+    return sqlite3.connect(DB_PATH)
+
 def init_db():
     """Инициализация структуры базы данных при запуске приложения."""
     db_dir = os.path.dirname(DB_PATH)
@@ -74,6 +78,165 @@ def init_db():
     # Память ИИ: ручные заметки админа, всегда подаются в контекст генерации
     c.execute('''CREATE TABLE IF NOT EXISTS ai_memory
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, note TEXT, created_at INTEGER)''')
+
+    # ================= CONTENT STORAGE =================
+    # Единое хранилище всех постов, проходящих через Smart Queue
+    c.execute('''CREATE TABLE IF NOT EXISTS posts
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  source TEXT DEFAULT 'telegram',
+                  source_url TEXT,
+                  original_message_id TEXT,
+                  original_channel_id TEXT,
+                  title TEXT,
+                  text TEXT,
+                  media TEXT,
+                  media_type TEXT DEFAULT 'text',
+                  caption TEXT,
+                  hashtags TEXT,
+                  category TEXT,
+                  language TEXT DEFAULT 'uz',
+                  created_at INTEGER,
+                  updated_at INTEGER,
+                  status TEXT DEFAULT 'available',
+                  priority INTEGER DEFAULT 5,
+                  is_used INTEGER DEFAULT 0,
+                  usage_count INTEGER DEFAULT 0,
+                  last_used_at INTEGER,
+                  times_published INTEGER DEFAULT 0,
+                  published_channels TEXT,
+                  tags TEXT,
+                  content_hash TEXT)''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_posts_lang ON posts(language)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_posts_hash ON posts(content_hash)")
+
+    # Теги (справочник) и связь пост<->тег
+    c.execute('''CREATE TABLE IF NOT EXISTS content_tags
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, tag TEXT UNIQUE)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS post_tags
+                 (post_id INTEGER, tag_id INTEGER, PRIMARY KEY (post_id, tag_id))''')
+
+    # ================= CHANNELS =================
+    # Расширенная конфигурация каналов (1:1 с managed_channels)
+    c.execute('''CREATE TABLE IF NOT EXISTS channel_settings
+                 (channel_id INTEGER PRIMARY KEY,
+                  name TEXT,
+                  username TEXT,
+                  network_id INTEGER,
+                  active INTEGER DEFAULT 1,
+                  description TEXT DEFAULT '',
+                  auto_publish INTEGER DEFAULT 1,
+                  interval_hours REAL DEFAULT 6,
+                  cron TEXT DEFAULT '',
+                  timezone TEXT DEFAULT 'Asia/Tashkent',
+                  start_time TEXT DEFAULT '',
+                  end_time TEXT DEFAULT '',
+                  max_posts_per_day INTEGER DEFAULT 0,
+                  selection TEXT DEFAULT 'random',
+                  categories TEXT DEFAULT '',
+                  tags TEXT DEFAULT '',
+                  languages TEXT DEFAULT 'uz',
+                  sources TEXT DEFAULT '',
+                  reuse_mode TEXT DEFAULT 'never',
+                  reuse_days INTEGER DEFAULT 7,
+                  post_template TEXT DEFAULT '',
+                  prefix TEXT DEFAULT '',
+                  suffix TEXT DEFAULT '',
+                  hashtags TEXT DEFAULT '',
+                  link_preview INTEGER DEFAULT 1,
+                  media_settings TEXT DEFAULT '',
+                  duplicate_protection INTEGER DEFAULT 1,
+                  flood_protection INTEGER DEFAULT 1,
+                  failed_retry_count INTEGER DEFAULT 3,
+                  cooldown INTEGER DEFAULT 0,
+                  rate_limit INTEGER DEFAULT 0,
+                  min_delay INTEGER DEFAULT 0,
+                  created_at INTEGER,
+                  updated_at INTEGER)''')
+
+    # Сети каналов
+    c.execute('''CREATE TABLE IF NOT EXISTS networks
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT,
+                  description TEXT DEFAULT '',
+                  created_at INTEGER,
+                  updated_at INTEGER)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS network_channels
+                 (network_id INTEGER, channel_id INTEGER, PRIMARY KEY (network_id, channel_id))''')
+
+    # Шаблоны настроек каналов
+    c.execute('''CREATE TABLE IF NOT EXISTS templates
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT,
+                  description TEXT DEFAULT '',
+                  data TEXT DEFAULT '{}',
+                  created_at INTEGER,
+                  updated_at INTEGER)''')
+
+    # ================= SCHEDULES & PUBLICATIONS =================
+    c.execute('''CREATE TABLE IF NOT EXISTS schedules
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  channel_id INTEGER,
+                  post_id INTEGER,
+                  scheduled_at INTEGER,
+                  status TEXT DEFAULT 'pending',
+                  created_at INTEGER)''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules(status, scheduled_at)")
+
+    c.execute('''CREATE TABLE IF NOT EXISTS publications
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  post_id INTEGER,
+                  channel_id INTEGER,
+                  network_id INTEGER,
+                  scheduled_at INTEGER,
+                  published_at INTEGER,
+                  status TEXT DEFAULT 'SUCCESS',
+                  error TEXT DEFAULT '',
+                  retry_count INTEGER DEFAULT 0,
+                  message_id TEXT DEFAULT '',
+                  created_at INTEGER)''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_pub_channel ON publications(channel_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_pub_status ON publications(status)")
+
+    c.execute('''CREATE TABLE IF NOT EXISTS publication_logs
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  publication_id INTEGER,
+                  channel_id INTEGER,
+                  post_id INTEGER,
+                  event TEXT,
+                  details TEXT DEFAULT '',
+                  created_at INTEGER)''')
+
+    # ================= EVENTS / AUDIT =================
+    c.execute('''CREATE TABLE IF NOT EXISTS system_events
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  event_type TEXT,
+                  message TEXT,
+                  data TEXT DEFAULT '',
+                  created_at INTEGER)''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON system_events(event_type)")
+
+    c.execute('''CREATE TABLE IF NOT EXISTS audit_log
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user TEXT DEFAULT 'admin',
+                  action TEXT,
+                  target TEXT DEFAULT '',
+                  old_value TEXT DEFAULT '',
+                  new_value TEXT DEFAULT '',
+                  created_at INTEGER)''')
+
+    # Миграции для существующей таблицы queue -> связь с posts
+    try: c.execute("ALTER TABLE queue ADD COLUMN post_id INTEGER")
+    except: pass
+    try: c.execute("ALTER TABLE queue ADD COLUMN priority INTEGER DEFAULT 5")
+    except: pass
+    try: c.execute("ALTER TABLE queue ADD COLUMN category TEXT")
+    except: pass
+    try: c.execute("ALTER TABLE queue ADD COLUMN tags TEXT")
+    except: pass
+    try: c.execute("ALTER TABLE queue ADD COLUMN created_at INTEGER")
+    except: pass
 
     conn.commit()
     conn.close()

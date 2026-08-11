@@ -14,6 +14,7 @@ import ai_generator
 import watermarker
 import keyboards
 import publisher
+import scheduler_engine
 import strings
 from bot_instance import bot
 
@@ -47,6 +48,36 @@ def ensure_html_tags(text):
             if middle:
                 return lines[0] + "\n\n<blockquote expandable>" + middle + "</blockquote>\n\n" + '\n'.join(lines[end_idx:])
     return text
+
+def _channel_id_by_username(username):
+    """Числовой id канала из managed_channels (или создаёт)."""
+    import sqlite3
+    conn = sqlite3.connect(database.DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM managed_channels WHERE username = ?", (username,))
+    row = cur.fetchone()
+    if not row:
+        cur.execute("INSERT INTO managed_channels (username) VALUES (?)", (username,))
+        cid = cur.lastrowid
+        conn.commit()
+    else:
+        cid = row[0]
+    conn.close()
+    return cid
+
+def _add_to_queue_integrated(photo, text, document, channel, scheduled_time=None):
+    """
+    Интеграция Smart Queue -> Content Storage (Фаза 4):
+    сохраняет пост в storage, затем создаёт запись в очереди.
+    """
+    lang = database.get_user_setting(config.ADMIN_IDS[0], 'persona', 'uz')
+    media_type = 'album' if photo and ',' in photo else ('photo' if photo else ('document' if document else 'text'))
+    # document хранится через запятую — кладём как есть
+    cid = _channel_id_by_username(channel)
+    scheduler_engine.add_to_storage_and_queue(
+        text=text, media=photo or "", media_type=media_type,
+        channel_id=cid, channel_username=channel,
+        scheduled_time=scheduled_time, language=lang, source='telegram')
 
 def register_handlers(bot_instance, user_drafts, album_cache):
     """Регистрация всех обработчиков."""
@@ -121,7 +152,8 @@ def register_handlers(bot_instance, user_drafts, album_cache):
                     if dt.timestamp() < time.time(): dt = dt.replace(year=dt.year + 1)
                     
                     draft = user_drafts[target_id]
-                    database.add_to_queue(draft.get('photo'), draft.get('text'), draft.get('document'), draft.get('channel', config.DEFAULT_CHANNEL), int(dt.timestamp()))
+                    _add_to_queue_integrated(draft.get('photo'), draft.get('text'), draft.get('document'),
+                                             draft.get('channel', config.DEFAULT_CHANNEL), int(dt.timestamp()))
                     user_states[user_id] = None
                     bot.delete_message(message.chat.id, target_id)
                     bot.send_message(message.chat.id, get_txt(user_id, 'scheduled', time=dt.strftime('%d.%m %H:%M')), reply_markup=keyboards.get_main_menu(lang))
@@ -309,14 +341,14 @@ def register_handlers(bot_instance, user_drafts, album_cache):
                 interval = int(database.get_global_setting('smart_queue_interval', 6))
                 last_time = database.get_last_scheduled_time() or int(time.time())
                 sched_time = max(int(time.time()), last_time) + interval * 3600
-                database.add_to_queue(draft['photo'], draft['text'], draft['document'], channel, sched_time)
+                _add_to_queue_integrated(draft['photo'], draft['text'], draft['document'], channel, sched_time)
                 database.delete_draft(user_id)
                 bot.delete_message(chat_id, target_id)
                 bot.send_message(chat_id, get_txt(user_id, 'smart_queue_added'), reply_markup=keyboards.get_main_menu(lang))
 
             elif action.startswith("sched"):
                 h = int(action.replace("sched", ""))
-                database.add_to_queue(draft['photo'], draft['text'], draft['document'], channel, int(time.time()) + h*3600)
+                _add_to_queue_integrated(draft['photo'], draft['text'], draft['document'], channel, int(time.time()) + h*3600)
                 database.delete_draft(user_id)
                 bot.delete_message(chat_id, target_id)
                 bot.send_message(chat_id, get_txt(user_id, 'scheduled', time=f"+{h}h"), reply_markup=keyboards.get_main_menu(lang))

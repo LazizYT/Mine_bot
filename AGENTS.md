@@ -40,6 +40,16 @@ opencode сразу знал контекст.
 
 ## Последние фиксы (сделаны)
 
+0. **CONTENT DISTRIBUTION PLATFORM (2026-08-11, фазы 1-8)**:
+   - **Новые модули**: `content_storage.py` (Content Storage: CRUD постов, дедуп по content_hash, reuse-логика, селекторы random/weighted/fifo/lifo/least_used/category_rotation/smart, `select_post`, `storage_stats`), `channel_manager.py` (настройки каналов `ensure/get/save/get_all/channel_table`, сети `create/get/rename/delete/add_channel/pause_network/is_network_paused/clone_network`, шаблоны `create/get/delete/apply_template`, bulk `bulk_update`, `clone_settings`, `delete_channel`), `scheduler_engine.py` (test_mode, `compute_next_run` interval/cron+tz, `find_due_channels`, `build_channel_settings`, `add_to_storage_and_queue`, `select_best_post`, `run_scheduler(dry_run)`, `retry_failed`, `log_publication`, `log_event`, `notify_admin`, `publication_history`, `analytics`, `calendar_events`).
+   - **БД** (`database.py`): таблицы `posts`, `content_tags`, `post_tags`, `channel_settings`, `networks`, `network_channels`, `templates`, `schedules`, `publications`, `publication_logs`, `system_events`, `audit_log` + миграции queue (`post_id`, `priority`, `category`, `tags`, `created_at`); хелпер `database._connect()`. `channel_settings` поля: name/username/network_id/active/auto_publish/interval_hours/cron/timezone/start_time/end_time/max_posts_per_day/selection/categories/tags/languages/sources/reuse_mode/reuse_days/post_template/prefix/suffix/hashtags/link_preview/media_settings/duplicate_protection/flood_protection/failed_retry_count/cooldown/rate_limit/min_delay.
+   - **Интеграция Smart Queue** (`handlers.py`): `_add_to_queue_integrated()` + `_channel_id_by_username()` — все три точки добавления в очередь (черновики/авто/расписание) теперь сохраняют пост и в storage, и в queue, и в schedules.
+   - **Планировщик** (`main.py`): `scheduler_engine.run_scheduler` каждую минуту + `retry_failed` каждые 30 мин (вместо publisher.process_queue).
+   - **Web-панель**: новая страница `/platform` (`templates/platform.html`) — Storage/Channels/Networks/Templates/Scheduler/Publications/Analytics/Events. API `/api/platform/*` (36 роутов: posts CRUD/archive/restore/duplicate/publish, channels settings/clone/bulk, networks CRUD/pause/clone, templates CRUD/apply, scheduler run/test-mode, publications history/retry, analytics, calendar, events, storage stats, settings).
+   - **Фикс**: в `scheduler_engine.build_channel_settings` убран битый лишний запрос (`SELECT post_id ... FROM posts`).
+   - **Фикс**: `channel_table()` — `reuse_mode`/`reuse_days` теперь отдаются корректно (была путаница).
+   - **Тесты**: локально проверены CRUD постов, дедуп, селекторы, каналы/сети/шаблоны/clone/bulk, scheduler dry-run, calendar, аналитика, все `/api/platform/*` + `/platform` (200), интеграция queue→storage (post_id связан), `main`/`handlers` импортируются. Тестовые данные в БД очищены.
+
 1. `database.py` — `DB_PATH` теперь `os.getenv('DB_PATH', os.path.join('data','bot_data.db'))` (кроссплатформенно), папка создаётся автоматически.
 2. `database.py` — добавлена функция `get_last_scheduled_time()` (её вызывал `handlers.py`).
 3. `mod_parser.py` — реализован `parse_modrinth()` через официальный Modrinth API (проверен: Sodium, 203M+ downloads).

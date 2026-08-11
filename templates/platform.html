@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MINE_BOT_OS | PLATFORM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link href="https://fonts.cdnfonts.com/css/minecraftia" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --bg: #0a0a0a; --card: #141414; --mc: #388e3c; --neon-p: #bc13fe; --neon-g: #39ff14; --white: #fff; }
+        body { background: var(--bg); color: var(--white); font-family: 'Minecraftia', sans-serif; letter-spacing: 1px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: var(--mc); }
+        .navbar { background: #000 !important; border-bottom: 3px solid var(--neon-p); box-shadow: 0 0 20px rgba(188, 19, 254, 0.3); }
+        .navbar-brand { color: var(--neon-g) !important; text-shadow: 0 0 5px var(--neon-g); font-size: 1.2rem; }
+        .nav-logo { height: 35px; margin-right: 12px; image-rendering: pixelated; }
+        .card { background: var(--card); border: 2px solid #2a2a2a; border-radius: 0; transition: all 0.3s ease; margin-bottom: 20px; }
+        .card:hover { border-color: var(--neon-p); box-shadow: 0 0 15px rgba(188, 19, 254, 0.2); transform: translateY(-3px); }
+        .btn-mc { border-radius: 0; text-transform: uppercase; font-size: 0.65rem; border-width: 2px; }
+        .btn-primary-mc { border-color: var(--neon-g); color: var(--neon-g); background: transparent; }
+        .btn-primary-mc:hover { background: var(--neon-g); color: #000; }
+        .btn-purple-mc { border-color: var(--neon-p); color: var(--neon-p); background: transparent; }
+        .btn-purple-mc:hover { background: var(--neon-p); color: #fff; }
+        .btn-danger-mc { border-color: #ff0033; color: #ff0033; background: transparent; }
+        .nav-tabs .nav-link { color: #888; border: none; font-size: 0.7rem; }
+        .nav-tabs .nav-link.active { background: transparent; color: var(--neon-p); border-bottom: 3px solid var(--neon-p); }
+        .form-control { background: #111 !important; color: #fff !important; border-radius: 0; border: 1px solid #444; font-family: monospace; }
+        .form-control:focus { background: #1a1a1a !important; color: #fff !important; border-color: var(--neon-p); box-shadow: 0 0 10px rgba(188, 19, 254, 0.5); outline: none; }
+        .form-select { background-color: #111 !important; color: #fff !important; border-radius: 0; border: 1px solid #444; }
+        .modal-content { background: #000; border: 3px solid var(--neon-p); border-radius: 0; }
+        .stat-num { font-size: 1.5rem; font-weight: bold; color: var(--neon-g); text-shadow: 0 0 10px var(--neon-g); }
+        .stat-label { font-size: 0.55rem; color: #ccc; }
+        .table { font-size: 0.65rem; color: #fff; }
+        .table th { color: var(--neon-g); border-color: #333; }
+        .table td { border-color: #222; vertical-align: middle; }
+        .badge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        .post-preview { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar { position: sticky; top: 20px; }
+        .sidebar .nav-link { color: #888; font-size: 0.7rem; padding: 8px 12px; border-left: 3px solid transparent; }
+        .sidebar .nav-link.active { color: var(--neon-g); border-left-color: var(--neon-g); background: rgba(57,255,20,0.05); }
+        .sidebar .nav-link i { width: 18px; }
+        label { color: #fff !important; font-size: 0.7rem; }
+        .small-text { font-size: 0.6rem; color: #aaa; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #333; transition: .3s; border-radius: 4px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: .3s; border-radius: 2px; }
+        input:checked + .slider { background: var(--neon-g); }
+        input:checked + .slider:before { transform: translateX(22px); }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark mb-4">
+    <div class="container d-flex justify-content-between">
+        <a class="navbar-brand" href="/"><img src="/logo.png" class="nav-logo">MINE_OS PLATFORM</a>
+        <div>
+            <button class="btn btn-primary-mc btn-mc px-3 me-2" onclick="location.href='/'">DASHBOARD</button>
+            <button class="btn btn-purple-mc btn-mc px-3" onclick="location.reload()">REFRESH</button>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-2">
+            <div class="card p-3 sidebar">
+                <h6 style="color: var(--neon-p); font-size: 0.7rem;">PLATFORM</h6>
+                <ul class="nav flex-column" id="side-nav">
+                    <li class="nav-item"><a class="nav-link active" data-sec="storage" href="#"><i class="bi bi-box-seam"></i> STORAGE</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="channels" href="#"><i class="bi bi-collection"></i> CHANNELS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="networks" href="#"><i class="bi bi-diagram-3"></i> NETWORKS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="templates" href="#"><i class="bi bi-files"></i> TEMPLATES</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="scheduler" href="#"><i class="bi bi-clock-history"></i> SCHEDULER</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="publications" href="#"><i class="bi bi-send-check"></i> PUBLICATIONS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="analytics" href="#"><i class="bi bi-graph-up"></i> ANALYTICS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="events" href="#"><i class="bi bi-activity"></i> EVENTS</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-10">
+            <!-- STORAGE -->
+            <div id="sec-storage">
+                <div class="row" id="storage-stats"></div>
+                <div class="card p-3">
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">CONTENT STORAGE</h5>
+                        <div class="ms-auto d-flex gap-2 flex-wrap">
+                            <input class="form-control form-control-sm" id="f-post-search" placeholder="SEARCH..." style="width:160px;">
+                            <select class="form-select form-select-sm" id="f-post-status" style="width:130px;">
+                                <option value="">ALL STATUS</option>
+                                <option>draft</option><option>queued</option><option>available</option>
+                                <option>scheduled</option><option>publishing</option><option>published</option>
+                                <option>archived</option><option>disabled</option><option>failed</option>
+                            </select>
+                            <select class="form-select form-select-sm" id="f-post-cat" style="width:130px;">
+                                <option value="">ALL CATEGORY</option>
+                                <option>Mods</option><option>Shaders</option><option>Maps</option><option>Textures</option>
+                            </select>
+                            <button class="btn btn-primary-mc btn-mc btn-sm" onclick="loadPosts()">FILTER</button>
+                            <button class="btn btn-purple-mc btn-mc btn-sm" onclick="openAddPost()">+ ADD POST</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th><th>PREVIEW</th><th>CATEGORY</th><th>LANG</th><th>PRIO</th>
+                                    <th>USED</th><th>STATUS</th><th>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="posts-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="small-text" id="posts-pager"></small>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadPosts(-1)">PREV</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadPosts(1)">NEXT</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHANNELS -->
+            <div id="sec-channels" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">CHANNELS</h5>
+                        <div class="ms-auto d-flex gap-2">
+                            <button class="btn btn-primary-mc btn-mc btn-sm" onclick="addChannelPrompt()">+ ADD CHANNEL</button>
+                            <button class="btn btn-purple-mc btn-mc btn-sm" onclick="openCloneChannels()">CLONE SETTINGS</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>CHANNEL</th><th>AUTO</th><th>INTERVAL</th><th>CRON</th><th>SELECTION</th>
+                                    <th>LANG</th><th>TIMEZONE</th><th>REUSE</th><th>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="channels-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NETWORKS -->
+            <div id="sec-networks" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">NETWORKS</h5>
+                        <button class="btn btn-primary-mc btn-mc btn-sm ms-auto" onclick="openAddNetwork()">+ NEW NETWORK</button>
+                    </div>
+                    <div id="networks-list"></div>
+                </div>
+            </div>
+
+            <!-- TEMPLATES -->
+            <div id="sec-templates" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">TEMPLATES</h5>
+                        <button class="btn btn-primary-mc btn-mc btn-sm ms-auto" onclick="openAddTemplate()">+ SAVE AS TEMPLATE</button>
+                    </div>
+                    <div id="templates-list"></div>
+                </div>
+            </div>
+
+            <!-- SCHEDULER -->
+            <div id="sec-scheduler" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">SCHEDULER</h5>
+                        <div class="ms-auto d-flex gap-3 align-items-center">
+                            <span class="small-text">TEST MODE</span>
+                            <label class="switch"><input type="checkbox" id="sched-test-mode" onchange="toggleTestMode()"><span class="slider"></span></label>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <input type="date" class="form-control" id="cal-date" onchange="loadCalendar()">
+                        </div>
+                        <div class="col-md-6 d-flex gap-2">
+                            <button class="btn btn-primary-mc btn-mc btn-sm" onclick="runScheduler(false)">RUN NOW</button>
+                            <button class="btn btn-purple-mc btn-mc btn-sm" onclick="runScheduler(true)">DRY RUN</button>
+                        </div>
+                    </div>
+                    <div class="mt-3 small-text" id="sched-result"></div>
+                    <div class="mt-3" id="calendar-events"></div>
+                </div>
+            </div>
+
+            <!-- PUBLICATIONS -->
+            <div id="sec-publications" style="display:none;">
+                <div class="card p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="m-0" style="color: var(--neon-g);">PUBLICATION HISTORY</h5>
+                        <div class="ms-auto d-flex gap-2">
+                            <select class="form-select form-select-sm" id="pub-status" style="width:140px;" onchange="loadPublications()">
+                                <option value="">ALL</option><option>SUCCESS</option><option>FAILED</option><option>RETRY</option>
+                            </select>
+                            <button class="btn btn-danger-mc btn-mc btn-sm" onclick="retryAll()">RETRY FAILED</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr><th>ID</th><th>POST</th><th>CHANNEL</th><th>SCHEDULED</th><th>PUBLISHED</th><th>STATUS</th><th>RETRIES</th><th>ERROR</th></tr>
+                            </thead>
+                            <tbody id="publications-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="small-text" id="pub-pager"></small>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadPublications(-1)">PREV</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadPublications(1)">NEXT</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANALYTICS -->
+            <div id="sec-analytics" style="display:none;">
+                <div class="row" id="analytics-cards"></div>
+                <div class="card p-3">
+                    <h6 style="color: var(--neon-g);">PUBLICATIONS PER DAY</h6>
+                    <canvas id="pub-chart" height="120"></canvas>
+                </div>
+            </div>
+
+            <!-- EVENTS -->
+            <div id="sec-events" style="display:none;">
+                <div class="card p-3">
+                    <h5 class="m-0 mb-3" style="color: var(--neon-g);">SYSTEM EVENTS</h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead><tr><th>#</th><th>TYPE</th><th>MESSAGE</th><th>TIME</th></tr></thead>
+                            <tbody id="events-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal fade" id="modalPost" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">POST</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+        <input type="hidden" id="p-id">
+        <div class="mb-2"><label>TITLE</label><input class="form-control" id="p-title"></div>
+        <div class="mb-2"><label>TEXT</label><textarea class="form-control" id="p-text" rows="6"></textarea></div>
+        <div class="row g-2">
+            <div class="col-6"><label>CATEGORY</label>
+                <select class="form-select" id="p-category"><option>Mods</option><option>Shaders</option><option>Maps</option><option>Textures</option><option></option></select></div>
+            <div class="col-6"><label>LANGUAGE</label>
+                <select class="form-select" id="p-language"><option>uz</option><option>ru</option><option>en</option></select></div>
+            <div class="col-4"><label>PRIORITY</label><input type="number" class="form-control" id="p-priority" value="5"></div>
+            <div class="col-4"><label>STATUS</label>
+                <select class="form-select" id="p-status"><option>available</option><option>draft</option><option>queued</option><option>disabled</option></select></div>
+            <div class="col-4"><label>SOURCE</label><input class="form-control" id="p-source" placeholder="modrinth/manual"></div>
+            <div class="col-12"><label>TAGS (comma separated)</label><input class="form-control" id="p-tags"></div>
+            <div class="col-12"><label>MEDIA FILE_ID</label><input class="form-control" id="p-media" placeholder="telegram file_id"></div>
+            <div class="col-6"><label>MEDIA TYPE</label>
+                <select class="form-select" id="p-media-type"><option>text</option><option>photo</option><option>album</option><option>document</option></select></div>
+            <div class="col-6"><label>SOURCE URL</label><input class="form-control" id="p-source-url"></div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-secondary btn-mc btn-sm" data-bs-dismiss="modal">CLOSE</button>
+        <button class="btn btn-primary-mc btn-mc btn-sm" onclick="savePost()">SAVE</button>
+    </div>
+</div></div></div>
+
+<div class="modal fade" id="modalChannel" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">CHANNEL SETTINGS</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="channel-form-body"></div>
+    <div class="modal-footer">
+        <button class="btn btn-danger-mc btn-mc btn-sm" onclick="deleteChannel()">DELETE CHANNEL</button>
+        <button class="btn btn-primary-mc btn-mc btn-sm" onclick="saveChannel()">SAVE</button>
+    </div>
+</div></div></div>
+
+<div class="modal fade" id="modalNetwork" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">NETWORK</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+        <input type="hidden" id="n-id">
+        <div class="mb-2"><label>NAME</label><input class="form-control" id="n-name"></div>
+        <div class="mb-2"><label>DESCRIPTION</label><input class="form-control" id="n-desc"></div>
+        <div class="mb-2"><label>CHANNELS (comma separated @username)</label><input class="form-control" id="n-channels"></div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-secondary btn-mc btn-sm" data-bs-dismiss="modal">CLOSE</button>
+        <button class="btn btn-primary-mc btn-mc btn-sm" onclick="saveNetwork()">SAVE</button>
+    </div>
+</div></div></div>
+
+<div class="modal fade" id="modalTemplate" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">TEMPLATE</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+        <input type="hidden" id="t-id">
+        <div class="mb-2"><label>NAME</label><input class="form-control" id="t-name"></div>
+        <div class="mb-2"><label>DESCRIPTION</label><input class="form-control" id="t-desc"></div>
+        <div class="mb-2"><label>CHANNELS TO APPLY (comma separated)</label><input class="form-control" id="t-channels"></div>
+        <div class="small-text">Template captures the current settings of the selected channel below.</div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-secondary btn-mc btn-sm" data-bs-dismiss="modal">CLOSE</button>
+        <button class="btn btn-primary-mc btn-mc btn-sm" onclick="saveTemplate()">SAVE</button>
+    </div>
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let postPage = 1, pubPage = 1, pubTotal = 0;
+let currentChannel = null, channelsCache = [];
+let pubChart = null;
+
+const sections = document.querySelectorAll('#side-nav .nav-link');
+sections.forEach(s => s.addEventListener('click', e => {
+    e.preventDefault();
+    sections.forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    document.querySelectorAll('[id^="sec-"]').forEach(x => x.style.display = 'none');
+    document.getElementById('sec-' + s.dataset.sec).style.display = 'block';
+    if (s.dataset.sec === 'storage') loadPosts();
+    if (s.dataset.sec === 'channels') loadChannels();
+    if (s.dataset.sec === 'networks') loadNetworks();
+    if (s.dataset.sec === 'templates') loadTemplates();
+    if (s.dataset.sec === 'scheduler') { loadTestMode(); loadCalendar(); }
+    if (s.dataset.sec === 'publications') loadPublications();
+    if (s.dataset.sec === 'analytics') loadAnalytics();
+    if (s.dataset.sec === 'events') loadEvents();
+}));
+
+async function api(url, method='GET', body=null) {
+    const opt = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opt.body = JSON.stringify(body);
+    const r = await fetch(url, opt);
+    return r.json();
+}
+
+async function toast(msg, ok=true) {
+    console.log((ok ? 'OK: ' : 'ERR: ') + msg);
+}
+
+// ---------- STORAGE ----------
+async function loadPosts(delta=0) {
+    if (delta) postPage += delta;
+    if (postPage < 1) postPage = 1;
+    const q = document.getElementById('f-post-search').value;
+    const st = document.getElementById('f-post-status').value;
+    const cat = document.getElementById('f-post-cat').value;
+    const url = `/api/platform/posts?page=${postPage}&per_page=15&q=${encodeURIComponent(q)}&status=${encodeURIComponent(st)}&category=${encodeURIComponent(cat)}`;
+    const d = await api(url);
+    const tbody = document.getElementById('posts-table');
+    tbody.innerHTML = '';
+    d.items.forEach(p => {
+        const stColor = { draft:'#888', queued:'#ffa500', available:'#39ff14', scheduled:'#bc13fe', published:'#00bfff', archived:'#555', disabled:'#555', failed:'#ff0033' }[p.status] || '#888';
+        const preview = (p.text || p.title || '').replace(/<[^>]+>/g, '');
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td>#${p.id}</td>
+            <td class="post-preview">${preview}</td>
+            <td>${p.category || ''}</td>
+            <td>${p.language || ''}</td>
+            <td>${p.priority || 5}</td>
+            <td>${p.usage_count || 0}</td>
+            <td><span class="badge-dot" style="background:${stColor}"></span>${p.status}</td>
+            <td class="text-nowrap">
+                <button class="btn btn-sm btn-purple-mc btn-mc" title="edit" onclick="openEditPost(${p.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-primary-mc btn-mc" title="publish" onclick="publishPost(${p.id})"><i class="bi bi-send"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" title="duplicate" onclick="dupPost(${p.id})"><i class="bi bi-files"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" title="archive" onclick="archivePost(${p.id})"><i class="bi bi-archive"></i></button>
+                <button class="btn btn-sm btn-danger-mc btn-mc" title="delete" onclick="delPost(${p.id})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`);
+    });
+    document.getElementById('posts-pager').textContent = `Page ${d.page}/${d.pages || 1} • Total ${d.total}`;
+    loadStorageStats();
+}
+
+async function loadStorageStats() {
+    const d = await api('/api/platform/storage/stats');
+    const s = d.stats || {};
+    document.getElementById('storage-stats').innerHTML = `
+        ${statCard('TOTAL', s.total || 0)} ${statCard('AVAILABLE', s.available || 0)} ${statCard('PUBLISHED', s.published || 0)}
+        ${statCard('SCHEDULED', s.scheduled || 0)} ${statCard('ARCHIVED', s.archived || 0)} ${statCard('FAILED', s.failed || 0)}`;
+}
+function statCard(label, val) {
+    return `<div class="col-md-2 col-4"><div class="card p-2 text-center"><div class="stat-num">${val}</div><div class="stat-label">${label}</div></div></div>`;
+}
+
+function openAddPost() {
+    document.getElementById('p-id').value = '';
+    ['p-title','p-text','p-tags','p-media','p-source','p-source-url'].forEach(x => document.getElementById(x).value = '');
+    document.getElementById('p-priority').value = 5;
+    document.getElementById('p-status').value = 'available';
+    document.getElementById('p-language').value = 'uz';
+    document.getElementById('p-category').value = 'Mods';
+    document.getElementById('p-media-type').value = 'text';
+    new bootstrap.Modal(document.getElementById('modalPost')).show();
+}
+
+async function openEditPost(id) {
+    const d = await api('/api/platform/posts/' + id);
+    const p = d.item;
+    document.getElementById('p-id').value = p.id;
+    document.getElementById('p-title').value = p.title || '';
+    document.getElementById('p-text').value = p.text || '';
+    document.getElementById('p-category').value = p.category || 'Mods';
+    document.getElementById('p-language').value = p.language || 'uz';
+    document.getElementById('p-priority').value = p.priority || 5;
+    document.getElementById('p-status').value = p.status || 'available';
+    document.getElementById('p-source').value = p.source || '';
+    document.getElementById('p-tags').value = (p.tags || '').replace(/,/g, ', ');
+    document.getElementById('p-media').value = p.media || '';
+    document.getElementById('p-media-type').value = p.media_type || 'text';
+    document.getElementById('p-source-url').value = p.source_url || '';
+    new bootstrap.Modal(document.getElementById('modalPost')).show();
+}
+
+async function savePost() {
+    const id = document.getElementById('p-id').value;
+    const body = {
+        title: document.getElementById('p-title').value,
+        text: document.getElementById('p-text').value,
+        category: document.getElementById('p-category').value,
+        language: document.getElementById('p-language').value,
+        priority: parseInt(document.getElementById('p-priority').value || 5),
+        status: document.getElementById('p-status').value,
+        source: document.getElementById('p-source').value,
+        tags: document.getElementById('p-tags').value,
+        media: document.getElementById('p-media').value,
+        media_type: document.getElementById('p-media-type').value,
+        source_url: document.getElementById('p-source-url').value
+    };
+    if (id) await api('/api/platform/posts/' + id, 'PUT', body);
+    else await api('/api/platform/posts', 'POST', body);
+    bootstrap.Modal.getInstance(document.getElementById('modalPost')).hide();
+    loadPosts();
+}
+
+async function publishPost(id) {
+    if (!confirm('Publish post #' + id + ' now?')) return;
+    await api(`/api/platform/posts/${id}/publish`, 'POST', { channel: '@lazikosmods' });
+    loadPosts();
+}
+async function dupPost(id) { await api(`/api/platform/posts/${id}/duplicate`, 'POST'); loadPosts(); }
+async function archivePost(id) { await api(`/api/platform/posts/${id}/archive`, 'POST'); loadPosts(); }
+async function delPost(id) {
+    if (!confirm('Delete post #' + id + '? This cannot be undone.')) return;
+    await api('/api/platform/posts/' + id, 'DELETE'); loadPosts();
+}
+
+// ---------- CHANNELS ----------
+async function loadChannels() {
+    const d = await api('/api/platform/channels');
+    channelsCache = d.items;
+    const tbody = document.getElementById('channels-table');
+    tbody.innerHTML = '';
+    d.items.forEach(c => {
+        const on = c.active ? '<span style="color:var(--neon-g)">ON</span>' : '<span style="color:#ff0033">OFF</span>';
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td style="color:var(--neon-g)">${c.username || ''}</td>
+            <td>${on}</td>
+            <td>${c.interval_hours || '-'}h</td>
+            <td>${c.cron || '-'}</td>
+            <td>${c.selection || 'random'}</td>
+            <td>${c.languages || '-'}</td>
+            <td>${c.timezone || 'Asia/Tashkent'}</td>
+            <td>${c.reuse_mode || 'unlimited'}</td>
+            <td class="text-nowrap">
+                <button class="btn btn-sm btn-purple-mc btn-mc" onclick="openChannel('${(c.username||'').replace(/'/g,"\\'")}')">SETTINGS</button>
+            </td>
+        </tr>`);
+    });
+}
+
+function openChannel(username) {
+    currentChannel = username;
+    const c = channelsCache.find(x => x.username === username) || {};
+    document.getElementById('channel-form-body').innerHTML = `
+        <input type="hidden" id="ch-username" value="${username}">
+        <div class="row g-2">
+            <div class="col-6"><label>CHANNEL</label><input class="form-control" value="${username}" disabled></div>
+            <div class="col-6"><label>ACTIVE</label>
+                <label class="switch"><input type="checkbox" id="ch-active" ${c.active ? 'checked' : ''}><span class="slider"></span></label></div>
+            <div class="col-6"><label>AUTO PUBLISH</label>
+                <label class="switch"><input type="checkbox" id="ch-auto" ${c.auto_publish ? 'checked' : ''}><span class="slider"></span></label></div>
+            <div class="col-6"><label>INTERVAL (hours)</label><input class="form-control" id="ch-interval" value="${c.interval_hours || 6}"></div>
+            <div class="col-6"><label>CRON (e.g. "0 12 * * *")</label><input class="form-control" id="ch-cron" value="${c.cron || ''}"></div>
+            <div class="col-6"><label>SELECTION ALGO</label>
+                <select class="form-select" id="ch-selection">
+                    ${['random','weighted','fifo','lifo','least_used','category_rotation','smart'].map(a =>
+                        `<option ${c.selection === a ? 'selected' : ''}>${a}</option>`).join('')}
+                </select></div>
+            <div class="col-6"><label>LANGUAGES</label><input class="form-control" id="ch-lang" value="${c.languages || ''}"></div>
+            <div class="col-6"><label>TIMEZONE</label><input class="form-control" id="ch-tz" value="${c.timezone || 'Asia/Tashkent'}"></div>
+            <div class="col-6"><label>REUSE MODE</label>
+                <select class="form-select" id="ch-reuse">
+                    ${['never','after_days','unlimited'].map(a => `<option ${c.reuse_mode === a ? 'selected' : ''}>${a}</option>`).join('')}
+                </select></div>
+            <div class="col-6"><label>REUSE AFTER (days)</label><input class="form-control" id="ch-reuse-days" value="${c.reuse_days || 7}"></div>
+            <div class="col-6"><label>FILTER: CATEGORY</label><input class="form-control" id="ch-filter-cat" value="${c.categories || ''}" placeholder="Mods,Shaders"></div>
+            <div class="col-6"><label>FILTER: TAGS</label><input class="form-control" id="ch-filter-tags" value="${c.tags || ''}" placeholder="sodium,optimization"></div>
+            <div class="col-12"><label>NOTES</label><input class="form-control" id="ch-notes" value="${c.description || ''}"></div>
+        </div>`;
+    new bootstrap.Modal(document.getElementById('modalChannel')).show();
+}
+
+async function saveChannel() {
+    const username = currentChannel;
+    const body = {
+        active: document.getElementById('ch-active').checked ? 1 : 0,
+        auto_publish: document.getElementById('ch-auto').checked ? 1 : 0,
+        interval_hours: document.getElementById('ch-interval').value,
+        cron: document.getElementById('ch-cron').value,
+        selection: document.getElementById('ch-selection').value,
+        languages: document.getElementById('ch-lang').value,
+        timezone: document.getElementById('ch-tz').value,
+        reuse_mode: document.getElementById('ch-reuse').value,
+        reuse_days: document.getElementById('ch-reuse-days').value,
+        categories: document.getElementById('ch-filter-cat').value,
+        tags: document.getElementById('ch-filter-tags').value,
+        description: document.getElementById('ch-notes').value,
+    };
+    await api('/api/platform/channels/' + encodeURIComponent(username), 'PUT', body);
+    bootstrap.Modal.getInstance(document.getElementById('modalChannel')).hide();
+    loadChannels();
+}
+
+async function deleteChannel() {
+    if (!currentChannel || !confirm('Delete channel ' + currentChannel + '?')) return;
+    await api('/api/platform/channels/' + encodeURIComponent(currentChannel) + '/delete', 'POST');
+    bootstrap.Modal.getInstance(document.getElementById('modalChannel')).hide();
+    loadChannels();
+}
+
+async function addChannelPrompt() {
+    const name = prompt('Channel username (e.g. @lazikosmods):');
+    if (!name) return;
+    await api('/api/platform/channels', 'POST', { text: '', media: '', media_type: 'text', title: '', category: '', language: 'uz', tags: '', source: 'manual', priority: 5, status: 'available' });
+    // ensure via a stub call: use PUT to create
+    const d = await api('/api/platform/channels');
+    const exists = d.items.some(c => c.username === name);
+    if (!exists) {
+        // create settings row via PUT (ensure_settings pattern)
+        await api('/api/platform/channels/' + encodeURIComponent(name), 'PUT', { active: 1, auto_publish: 1 });
+    }
+    loadChannels();
+}
+
+async function openCloneChannels() {
+    const src = prompt('Source channel (@username):');
+    if (!src) return;
+    const targets = prompt('Target channels (comma separated):');
+    if (!targets) return;
+    await api('/api/platform/channels/clone', 'POST', { source: src, targets: targets.split(',').map(s => s.trim()).filter(Boolean) });
+    loadChannels();
+}
+
+// ---------- NETWORKS ----------
+async function loadNetworks() {
+    const d = await api('/api/platform/networks');
+    const el = document.getElementById('networks-list');
+    el.innerHTML = '';
+    if (!d.items.length) { el.innerHTML = '<div class="small-text text-center py-4">NO NETWORKS</div>'; return; }
+    d.items.forEach(n => {
+        el.insertAdjacentHTML('beforeend', `
+        <div class="card p-3 mb-2">
+            <div class="d-flex align-items-center">
+                <div>
+                    <h6 style="color:var(--neon-g)">${n.name} ${n.paused ? '<span class="badge bg-danger">PAUSED</span>' : ''}</h6>
+                    <small class="small-text">${n.description || ''} • ${n.channels.length} channels</small>
+                </div>
+                <div class="ms-auto d-flex gap-2">
+                    <button class="btn btn-sm btn-primary-mc btn-mc" onclick="toggleNetworkPause(${n.id}, ${n.paused})">${n.paused ? 'RESUME' : 'PAUSE'}</button>
+                    <button class="btn btn-sm btn-purple-mc btn-mc" onclick="cloneNetwork(${n.id})">CLONE</button>
+                    <button class="btn btn-sm btn-danger-mc btn-mc" onclick="delNetwork(${n.id})">DELETE</button>
+                </div>
+            </div>
+            <div class="mt-2">
+                ${n.channels.map(c => `<span class="badge bg-dark border border-secondary me-1">${c.username}</span>`).join('')}
+            </div>
+        </div>`);
+    });
+}
+
+function openAddNetwork() {
+    document.getElementById('n-id').value = '';
+    ['n-name','n-desc','n-channels'].forEach(x => document.getElementById(x).value = '');
+    new bootstrap.Modal(document.getElementById('modalNetwork')).show();
+}
+
+async function saveNetwork() {
+    const id = document.getElementById('n-id').value;
+    const body = {
+        name: document.getElementById('n-name').value,
+        description: document.getElementById('n-desc').value,
+        channels: document.getElementById('n-channels').value.split(',').map(s => s.trim()).filter(Boolean)
+    };
+    if (id) await api('/api/platform/networks/' + id, 'PUT', body);
+    else await api('/api/platform/networks', 'POST', body);
+    bootstrap.Modal.getInstance(document.getElementById('modalNetwork')).hide();
+    loadNetworks();
+}
+
+async function toggleNetworkPause(id, paused) {
+    await api('/api/platform/networks/' + id, 'PUT', { pause: !paused });
+    loadNetworks();
+}
+async function cloneNetwork(id) {
+    const name = prompt('New network name:');
+    if (!name) return;
+    await api(`/api/platform/networks/${id}/clone`, 'POST', { name });
+    loadNetworks();
+}
+async function delNetwork(id) {
+    if (!confirm('Delete network?')) return;
+    await api('/api/platform/networks/' + id, 'DELETE');
+    loadNetworks();
+}
+
+// ---------- TEMPLATES ----------
+async function loadTemplates() {
+    const d = await api('/api/platform/templates');
+    const el = document.getElementById('templates-list');
+    el.innerHTML = '';
+    if (!d.items.length) { el.innerHTML = '<div class="small-text text-center py-4">NO TEMPLATES</div>'; return; }
+    d.items.forEach(t => {
+        el.insertAdjacentHTML('beforeend', `
+        <div class="card p-3 mb-2 d-flex flex-row align-items-center">
+            <div>
+                <h6 style="color:var(--neon-g)">${t.name}</h6>
+                <small class="small-text">${t.description || ''}</small>
+            </div>
+            <div class="ms-auto d-flex gap-2">
+                <button class="btn btn-sm btn-primary-mc btn-mc" onclick="applyTemplate(${t.id})">APPLY TO CHANNELS</button>
+                <button class="btn btn-sm btn-danger-mc btn-mc" onclick="delTemplate(${t.id})">DELETE</button>
+            </div>
+        </div>`);
+    });
+}
+
+async function openAddTemplate() {
+    const src = prompt('Capture settings from channel (@username):');
+    const name = prompt('Template name:');
+    if (!src || !name) return;
+    const c = channelsCache.find(x => x.username === src);
+    if (!c) return alert('Channel not found');
+    await api('/api/platform/templates', 'POST', {
+        name, description: 'From ' + src,
+        data: { interval_hours: c.interval_hours, selection: c.selection, languages: c.languages, timezone: c.timezone, reuse_mode: c.reuse_mode, reuse_after_days: c.reuse_after_days }
+    });
+    loadTemplates();
+}
+
+async function applyTemplate(id) {
+    const targets = prompt('Apply to channels (comma separated):');
+    if (!targets) return;
+    await api(`/api/platform/templates/${id}/apply`, 'POST', { channels: targets.split(',').map(s => s.trim()).filter(Boolean) });
+    alert('Applied');
+}
+async function delTemplate(id) {
+    if (!confirm('Delete template?')) return;
+    await api('/api/platform/templates/' + id, 'DELETE');
+    loadTemplates();
+}
+
+// ---------- SCHEDULER ----------
+async function loadTestMode() {
+    const d = await api('/api/platform/settings');
+    document.getElementById('sched-test-mode').checked = d.settings.test_mode === '1';
+}
+async function toggleTestMode() {
+    const on = document.getElementById('sched-test-mode').checked;
+    await api('/api/platform/scheduler/test-mode', 'POST', { enabled: on });
+}
+async function runScheduler(dryRun) {
+    const d = await api('/api/platform/scheduler/run', 'POST', { dry_run: dryRun });
+    const r = d.report || {};
+    document.getElementById('sched-result').innerHTML =
+        `<b style="color:var(--neon-g)">due:</b> ${r.due} | <b style="color:var(--neon-g)">selected:</b> ${r.selected} | <b style="color:var(--neon-g)">skipped:</b> ${r.skipped}` +
+        (r.reasons && r.reasons.length ? `<br><small>${r.reasons.map(x => x.join(' → ')).join('<br>')}</small>` : '');
+    loadCalendar();
+}
+async function loadCalendar() {
+    const day = document.getElementById('cal-date').value || new Date().toISOString().slice(0,10);
+    document.getElementById('cal-date').value = day;
+    const d = await api('/api/platform/calendar?day=' + day);
+    const el = document.getElementById('calendar-events');
+    if (!d.items.length) { el.innerHTML = '<div class="small-text">No scheduled events for this day.</div>'; return; }
+    el.innerHTML = d.items.map(e =>
+        `<div class="border-start border-success ps-2 py-1 mb-1"><small>${new Date(e.time * 1000).toLocaleTimeString()} — <b style="color:var(--neon-g)">${e.channel}</b> → post #${e.post_id}</small></div>`
+    ).join('');
+}
+
+// ---------- PUBLICATIONS ----------
+async function loadPublications(delta=0) {
+    if (delta) pubPage += delta;
+    if (pubPage < 1) pubPage = 1;
+    const st = document.getElementById('pub-status').value;
+    const d = await api(`/api/platform/publications?page=${pubPage}&per_page=20&status=${encodeURIComponent(st)}`);
+    pubTotal = d.total;
+    const tbody = document.getElementById('publications-table');
+    tbody.innerHTML = '';
+    d.items.forEach(p => {
+        const color = p.status === 'SUCCESS' ? 'var(--neon-g)' : (p.status === 'FAILED' ? '#ff0033' : '#ffa500');
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td>#${p.id}</td>
+            <td>#${p.post_id}</td>
+            <td style="color:var(--neon-g)">${p.channel || ''}</td>
+            <td>${p.scheduled_at ? new Date(p.scheduled_at * 1000).toLocaleString() : '-'}</td>
+            <td>${p.published_at ? new Date(p.published_at * 1000).toLocaleString() : '-'}</td>
+            <td style="color:${color}">${p.status}</td>
+            <td>${p.retry_count}</td>
+            <td class="post-preview" style="max-width:180px">${p.error || ''}</td>
+        </tr>`);
+    });
+    document.getElementById('pub-pager').textContent = `Page ${d.page} • Total ${pubTotal}`;
+}
+async function retryAll() {
+    if (!confirm('Retry all FAILED publications?')) return;
+    await api('/api/platform/publications/retry', 'POST');
+    loadPublications();
+}
+
+// ---------- ANALYTICS ----------
+async function loadAnalytics() {
+    const d = await api('/api/platform/analytics');
+    const a = d.analytics;
+    const p = a.posts || {}, pb = a.publications || {};
+    document.getElementById('analytics-cards').innerHTML = `
+        ${statCard('POSTS TOTAL', p.total)} ${statCard('PUBLISHED', p.published)} ${statCard('AVAILABLE', p.available)}
+        ${statCard('FAILED', p.failed)} ${statCard('PUBLICATIONS', pb.total)} ${statCard('OK', pb.success)} ${statCard('ERRORS', pb.failed)}`;
+    const labels = Object.keys(a.per_day || {});
+    const vals = Object.values(a.per_day || {});
+    const ctx = document.getElementById('pub-chart').getContext('2d');
+    if (pubChart) pubChart.destroy();
+    pubChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Publications', data: vals, backgroundColor: 'rgba(57,255,20,0.4)', borderColor: '#39ff14', borderWidth: 1 }] },
+        options: { scales: { y: { beginAtZero: true, ticks: { color: '#888' } }, x: { ticks: { color: '#888' } } }, plugins: { legend: { labels: { color: '#fff' } } } }
+    });
+}
+
+// ---------- EVENTS ----------
+async function loadEvents() {
+    const d = await api('/api/platform/events?limit=100');
+    const tbody = document.getElementById('events-table');
+    tbody.innerHTML = '';
+    d.items.forEach(e => {
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td>#${e.id}</td>
+            <td><span class="badge bg-dark border border-secondary">${e.type}</span></td>
+            <td class="post-preview" style="max-width:400px">${e.message}</td>
+            <td>${new Date(e.created_at * 1000).toLocaleString()}</td>
+        </tr>`);
+    });
+}
+
+loadPosts();
+</script>
+</body>
+</html>

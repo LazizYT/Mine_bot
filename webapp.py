@@ -9,6 +9,9 @@ import telebot
 import publisher
 import comments_analyzer
 import ai_generator
+import content_storage
+import channel_manager
+import scheduler_engine
 from bot_instance import bot
 
 app = Flask(__name__)
@@ -491,6 +494,349 @@ def reorder():
             
     return jsonify({'status': 'success'})
 
+# ---------------------------------------------------------------------------
+# CONTENT DISTRIBUTION PLATFORM API (Фазы 7-8)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/platform/posts', methods=['GET'])
+def api_platform_posts():
+    status = request.args.get('status')
+    category = request.args.get('category')
+    language = request.args.get('language')
+    source = request.args.get('source')
+    tag = request.args.get('tag')
+    q = request.args.get('q')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    data = content_storage.list_posts(
+        status=status, category=category, language=language, source=source,
+        tag=tag, search=q, page=page, per_page=per_page)
+    cols = ['id', 'title', 'text', 'category', 'language', 'source', 'status', 'priority',
+            'usage_count', 'times_published', 'last_used_at', 'tags', 'media', 'created_at']
+    items = [dict(zip(cols, row)) for row in data['items']]
+    return jsonify({'status': 'success', 'items': items, 'total': data['total'],
+                    'page': data['page'], 'per_page': data['per_page'], 'pages': data['pages']})
+
+
+@app.route('/api/platform/posts', methods=['POST'])
+def api_platform_posts_create():
+    data = request.json or {}
+    post_id, dup = content_storage.create_post(
+        text=data.get('text', ''), media=data.get('media', ''),
+        media_type=data.get('media_type', 'text'), caption=data.get('caption', ''),
+        title=data.get('title', ''), category=data.get('category', ''),
+        language=data.get('language', 'uz'), tags=data.get('tags', ''),
+        source=data.get('source', 'manual'), source_url=data.get('source_url', ''),
+        priority=int(data.get('priority', 5) or 5),
+        status=data.get('status', 'available'))
+    if post_id is None:
+        return jsonify({'status': 'error', 'error': 'Duplicate or invalid'}), 400
+    return jsonify({'status': 'success', 'post_id': post_id, 'duplicate': bool(dup)})
+
+
+@app.route('/api/platform/posts/<int:post_id>', methods=['GET'])
+def api_platform_post_get(post_id):
+    post = content_storage.get_post(post_id)
+    if not post:
+        return jsonify({'status': 'error', 'error': 'Not found'}), 404
+    post['tags'] = content_storage.get_post_tags(post_id)
+    return jsonify({'status': 'success', 'item': post})
+
+
+@app.route('/api/platform/posts/<int:post_id>', methods=['PUT'])
+def api_platform_post_update(post_id):
+    data = request.json or {}
+    fields = {k: v for k, v in data.items() if k in (
+        'text', 'media', 'media_type', 'caption', 'title', 'category',
+        'language', 'source', 'source_url', 'priority', 'status', 'tags')}
+    if 'tags' in fields:
+        tags = fields.pop('tags')
+    else:
+        tags = None
+    if fields:
+        content_storage.update_post(post_id, **fields)
+    if tags is not None:
+        conn = database._connect()
+        content_storage._sync_tags(conn, post_id, tags)
+        conn.close()
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/posts/<int:post_id>', methods=['DELETE'])
+def api_platform_post_delete(post_id):
+    content_storage.delete_post(post_id)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/posts/<int:post_id>/archive', methods=['POST'])
+def api_platform_post_archive(post_id):
+    content_storage.archive_post(post_id)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/posts/<int:post_id>/restore', methods=['POST'])
+def api_platform_post_restore(post_id):
+    content_storage.restore_post(post_id)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/posts/<int:post_id>/duplicate', methods=['POST'])
+def api_platform_post_duplicate(post_id):
+    new_id = content_storage.duplicate_post(post_id)
+    return jsonify({'status': 'success', 'post_id': new_id})
+
+
+@app.route('/api/platform/posts/<int:post_id>/publish', methods=['POST'])
+def api_platform_post_publish(post_id):
+    data = request.json or {}
+    username = data.get('channel', config.DEFAULT_CHANNEL)
+    post = content_storage.get_post(post_id)
+    if not post:
+        return jsonify({'status': 'error', 'error': 'Not found'}), 404
+    ok, err = scheduler_engine._publish(bot, post_id, username, post, int(time.time()))
+    if not ok:
+        return jsonify({'status': 'error', 'error': str(err)}), 500
+    content_storage.update_post(post_id, status='published')
+    content_storage.mark_used(post_id, username)
+    ch_settings = channel_manager.ensure_settings(username)
+    channel_id = ch_settings.get('channel_id')
+    if not channel_id:
+        import sqlite3
+        conn = sqlite3.connect(database.DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT id FROM managed_channels WHERE username = ?", (username,))
+        row = c.fetchone()
+        conn.close()
+        channel_id = row[0] if row else None
+    scheduler_engine.log_publication(post_id, channel_id, None, int(time.time()), 'SUCCESS')
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/storage/stats', methods=['GET'])
+def api_platform_storage_stats():
+    return jsonify({'status': 'success', 'stats': content_storage.storage_stats()})
+
+
+@app.route('/api/platform/channels', methods=['GET'])
+def api_platform_channels():
+    items = channel_manager.channel_table()
+    return jsonify({'status': 'success', 'items': items})
+
+
+@app.route('/api/platform/channels/<path:username>', methods=['GET'])
+def api_platform_channel_get(username):
+    settings = channel_manager.get_settings(username)
+    if not settings:
+        return jsonify({'status': 'error', 'error': 'Not found'}), 404
+    return jsonify({'status': 'success', 'item': settings})
+
+
+@app.route('/api/platform/channels/<path:username>', methods=['PUT'])
+def api_platform_channel_update(username):
+    data = request.json or {}
+    channel_manager.save_settings(username, data)
+    scheduler_engine.log_event('settings_update', f"Channel {username} settings updated", data=str(list(data.keys())))
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/channels/<path:username>/delete', methods=['POST'])
+def api_platform_channel_delete(username):
+    channel_manager.delete_channel(username)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/channels/clone', methods=['POST'])
+def api_platform_channels_clone():
+    data = request.json or {}
+    src = data.get('source')
+    targets = data.get('targets', [])
+    if not src or not targets:
+        return jsonify({'status': 'error', 'error': 'source and targets required'}), 400
+    count = channel_manager.clone_settings(src, targets)
+    return jsonify({'status': 'success', 'count': count})
+
+
+@app.route('/api/platform/channels/bulk', methods=['POST'])
+def api_platform_channels_bulk():
+    data = request.json or {}
+    channels = data.get('channels', [])
+    updates = data.get('updates', {})
+    if not channels or not updates:
+        return jsonify({'status': 'error', 'error': 'channels and updates required'}), 400
+    count = channel_manager.bulk_update(channels, updates)
+    return jsonify({'status': 'success', 'count': count})
+
+
+@app.route('/api/platform/networks', methods=['GET'])
+def api_platform_networks():
+    nets = channel_manager.get_networks()
+    result = []
+    for n in nets:
+        result.append({
+            'id': n['id'], 'name': n['name'], 'description': n['description'],
+            'publications': n['publications'],
+            'paused': channel_manager.is_network_paused(n['id']),
+            'channels': [{'username': c} for c in channel_manager.network_channels(n['id'])]
+        })
+    return jsonify({'status': 'success', 'items': result})
+
+
+@app.route('/api/platform/networks', methods=['POST'])
+def api_platform_networks_create():
+    data = request.json or {}
+    nid = channel_manager.create_network(data.get('name', ''), data.get('description', ''))
+    for ch in data.get('channels', []):
+        if ch:
+            channel_manager.add_channel_to_network(nid, ch)
+    return jsonify({'status': 'success', 'network_id': nid})
+
+
+@app.route('/api/platform/networks/<int:nid>', methods=['PUT'])
+def api_platform_network_update(nid):
+    data = request.json or {}
+    if 'name' in data:
+        channel_manager.rename_network(nid, data['name'])
+    if 'pause' in data:
+        channel_manager.pause_network(nid, bool(data['pause']))
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/networks/<int:nid>', methods=['DELETE'])
+def api_platform_network_delete(nid):
+    channel_manager.delete_network(nid)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/networks/<int:nid>/channels', methods=['POST'])
+def api_platform_network_channels(nid):
+    data = request.json or {}
+    action = data.get('action', 'add')
+    username = data.get('username')
+    if not username:
+        return jsonify({'status': 'error', 'error': 'username required'}), 400
+    if action == 'add':
+        channel_manager.add_channel_to_network(nid, username)
+    else:
+        channel_manager.remove_channel_from_network(nid, username)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/networks/<int:nid>/clone', methods=['POST'])
+def api_platform_network_clone(nid):
+    data = request.json or {}
+    new_id = channel_manager.clone_network(nid, data.get('name', ''))
+    return jsonify({'status': 'success', 'network_id': new_id})
+
+
+@app.route('/api/platform/templates', methods=['GET'])
+def api_platform_templates():
+    items = [{'id': t['id'], 'name': t['name'], 'description': t['description'],
+              'data': t['data'], 'created_at': t['created_at']} for t in channel_manager.get_templates()]
+    return jsonify({'status': 'success', 'items': items})
+
+
+@app.route('/api/platform/templates', methods=['POST'])
+def api_platform_templates_create():
+    data = request.json or {}
+    tid = channel_manager.create_template(data.get('name', ''), data.get('description', ''), data.get('data', {}))
+    return jsonify({'status': 'success', 'template_id': tid})
+
+
+@app.route('/api/platform/templates/<int:tid>', methods=['DELETE'])
+def api_platform_template_delete(tid):
+    channel_manager.delete_template(tid)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/platform/templates/<int:tid>/apply', methods=['POST'])
+def api_platform_template_apply(tid):
+    data = request.json or {}
+    channels = data.get('channels', [])
+    count = channel_manager.apply_template(tid, channels)
+    return jsonify({'status': 'success', 'count': count})
+
+
+@app.route('/api/platform/scheduler/run', methods=['POST'])
+def api_platform_scheduler_run():
+    data = request.json or {}
+    dry_run = bool(data.get('dry_run', False))
+    if data.get('test_mode') is not None:
+        scheduler_engine.set_test_mode(bool(data['test_mode']))
+    report = scheduler_engine.run_scheduler(bot, dry_run=dry_run)
+    return jsonify({'status': 'success', 'report': report, 'test_mode': scheduler_engine.test_mode_enabled()})
+
+
+@app.route('/api/platform/scheduler/test-mode', methods=['POST'])
+def api_platform_scheduler_test_mode():
+    data = request.json or {}
+    scheduler_engine.set_test_mode(bool(data.get('enabled', False)))
+    return jsonify({'status': 'success', 'test_mode': scheduler_engine.test_mode_enabled()})
+
+
+@app.route('/api/platform/publications', methods=['GET'])
+def api_platform_publications():
+    status = request.args.get('status')
+    channel_id = request.args.get('channel_id', type=int)
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    data = scheduler_engine.publication_history(status=status, channel_id=channel_id, page=page, per_page=per_page)
+    return jsonify({'status': 'success', **data})
+
+
+@app.route('/api/platform/publications/retry', methods=['POST'])
+def api_platform_publications_retry():
+    done = scheduler_engine.retry_failed(bot)
+    return jsonify({'status': 'success', 'retried': done})
+
+
+@app.route('/api/platform/analytics', methods=['GET'])
+def api_platform_analytics():
+    return jsonify({'status': 'success', 'analytics': scheduler_engine.analytics()})
+
+
+@app.route('/api/platform/events', methods=['GET'])
+def api_platform_events():
+    limit = int(request.args.get('limit', 100))
+    conn = database._connect()
+    cur = conn.cursor()
+    cur.execute("SELECT id, event_type, message, data, created_at FROM system_events ORDER BY id DESC LIMIT ?", (limit,))
+    rows = [{'id': r[0], 'type': r[1], 'message': r[2], 'data': r[3], 'created_at': r[4]} for r in cur.fetchall()]
+    conn.close()
+    return jsonify({'status': 'success', 'items': rows})
+
+
+@app.route('/api/platform/calendar', methods=['GET'])
+def api_platform_calendar():
+    day = request.args.get('day')
+    return jsonify({'status': 'success', 'items': scheduler_engine.calendar_events(day)})
+
+
+@app.route('/api/platform/settings', methods=['GET'])
+def api_platform_settings():
+    keys = ['test_mode', 'smart_queue_interval', 'notifications_enabled', 'default_channel', 'language', 'persona']
+    out = {}
+    for k in keys:
+        out[k] = database.get_global_setting(k, '')
+    out['admin_ids'] = list(getattr(config, 'ADMIN_IDS', []))
+    out['default_channel'] = config.DEFAULT_CHANNEL
+    return jsonify({'status': 'success', 'settings': out})
+
+
+@app.route('/api/platform/settings', methods=['PUT'])
+def api_platform_settings_update():
+    data = request.json or {}
+    for k, v in data.items():
+        database.set_global_setting(k, str(v))
+    scheduler_engine.log_event('settings_update', 'Global settings updated', data=str(list(data.keys())))
+    return jsonify({'status': 'success'})
+
+
+@app.route('/platform')
+def platform_page():
+    return render_template('platform.html')
+
+
 def run_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
+
