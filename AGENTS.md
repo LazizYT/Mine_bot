@@ -41,6 +41,14 @@ opencode сразу знал контекст.
 
 ## Последние фиксы (сделаны)
 
+0. **USERBOT: история захвата + альбомы + видео (2026-08-11)**:
+   - **Таблица `userbot_history`** (database.py): каждая перехваченная message_id фиксируется (антиповтор) — функции `userbot_history_add`/`exists`/`get`/`list`. `userbot.py` теперь использует её вместо `last_message_id` (двойная защита), логирует `status='captured'`/`'skipped'`/`'error'`.
+   - **Альбомы**: все фото/видео одной `media_group_id` объединяются в ОДИН пост (`media_type=album`, media = пути через запятую). Роутинг в `capture_message`: есть `media_group_id` → собрать группу через `client.get_media_group` и `capture_album`.
+   - **Бэкфилл пропущенных**: `backfill(client, source)` — при старте вычитывает историю канала от `last_message_id`, захватывает пропущенные (лимит `USERBOT_BACKFILL_LIMIT`, дефолт 10).
+   - **Видео в паблишинге**: `publisher.publish_post_data` получил `media_type` ('photo'/'album'/'video'/'text'/'document'), одиночное видео → `send_video`, альбомы со смешанным типом определяют `InputMediaVideo`/`InputMediaPhoto` по расширению файла (`_is_video`, mp4/webm/mov/mkv/avi/m4v). `scheduler_engine._publish` передаёт `media_type`.
+   - **Панель**: секция CAPTURE HISTORY в `/platform` (последние 100, столбцы POST/SOURCE/MSG/GROUP/STATUS/TIME), API `/api/platform/userbot/history?limit=&source=`, грузится при открытии вкладки USERBOT.
+   - **Тесты**: 65 OK (добавлен `test_userbot_history_api`).
+
 0. **ХАРДЕНИНГ + РЕФАКТОРИНГ (2026-08-11)**:
    - **Панель теперь ТОЛЬКО для владельца**: `config.ADMIN_IDS = [8641832514]` (user id пользователя). Новая авторизация: `panel_auth.py` (валидация Telegram WebApp initData по HMAC + подписанные сессионные cookie `panel_session`). Вход через кнопку Studio в боте (WebApp initData) ИЛИ по логину/паролю (`/api/auth/login`). Включена ОБЯЗАТЕЛЬНО (`PANEL_AUTH_REQUIRED=1` по умолчанию; отключается только `PANEL_AUTH_REQUIRED=0` для тестов). Неавторизованные: HTML → редирект на `/auth`, API → 401.
    - **SQLite WAL**: `database._connect()` теперь `PRAGMA journal_mode=WAL` + `busy_timeout=10000` + `timeout=15` — защита от "database is locked" при конкурентной записи. Все прямые `sqlite3.connect(DB_PATH)` заменены на `_connect()`.

@@ -399,6 +399,14 @@ def api_platform_userbot_status():
     return jsonify({'status': 'success', **userbot.status()})
 
 
+@platform_bp.route('/api/platform/userbot/history', methods=['GET'])
+def api_platform_userbot_history():
+    limit = min(int(request.args.get('limit', 100) or 100), 500)
+    source = request.args.get('source') or None
+    items = database.userbot_history_list(limit=limit, source_username=source)
+    return jsonify({'status': 'success', 'items': items})
+
+
 @platform_bp.route('/api/platform/userbot/sources', methods=['GET'])
 def api_platform_userbot_sources():
     return jsonify({'status': 'success', 'items': database.userbot_get_sources()})

@@ -28,11 +28,17 @@ def _split_media(media_str):
             photos.append(part)
     return photos, docs
 
-def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_auto=False):
+_VIDEO_EXT = ('.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v')
+
+def _is_video(path):
+    return str(path).lower().endswith(_VIDEO_EXT)
+
+def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_auto=False, media_type='photo'):
     """
     Основная функция публикации контента в Telegram канал.
     Проверяет права бота в канале.
     photo_id/document_id могут быть file_id, URL или локальными путями к файлам.
+    media_type: photo / album / video / text / document.
     """
     try:
         # Проверка прав администратора
@@ -46,20 +52,39 @@ def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_
             if sq_text and sq_text not in text:
                 text += f"\n\n{sq_text}"
 
-        # 1. Отправка фото или альбома
+        # 1. Отправка медиа
         sent_message = None
-        if photo_id:
+        if media_type == 'video' and photo_id:
+            # одиночное видео
+            if len(text) <= 1024:
+                sent_message = bot.send_video(channel_id, _open_media(photo_id), caption=text, parse_mode='HTML')
+            else:
+                bot.send_video(channel_id, _open_media(photo_id))
+                sent_message = bot.send_message(channel_id, text, parse_mode='HTML')
+        elif photo_id:
             if ',' in photo_id: # Если в строке несколько ID через запятую — это альбом
                 ids = photo_id.split(',')
-                # Формируем список MediaGroup. Текст (caption) прикрепляем к первому фото.
-                media = [telebot.types.InputMediaPhoto(media=_open_media(pid), caption=text if i==0 and len(text)<=1024 else None, parse_mode='HTML') for i, pid in enumerate(ids)]
+                # Формируем список MediaGroup. Текст (caption) прикрепляем к первому элементу.
+                media = []
+                for i, pid in enumerate(ids):
+                    cap = text if i == 0 and len(text) <= 1024 else None
+                    if _is_video(pid):
+                        media.append(telebot.types.InputMediaVideo(media=_open_media(pid), caption=cap, parse_mode='HTML'))
+                    else:
+                        media.append(telebot.types.InputMediaPhoto(media=_open_media(pid), caption=cap, parse_mode='HTML'))
                 messages = bot.send_media_group(channel_id, media)
                 sent_message = messages[0] # Сохраняем ID первого сообщения в группе
                 # Если текст слишком длинный для подписи к фото (>1024 симв), отправляем его отдельным сообщением
                 if len(text) > 1024:
                     bot.send_message(channel_id, text, parse_mode='HTML')
-            else: # Одиночное фото
-                if len(text) <= 1024:
+            else: # Одиночное фото/видео
+                if _is_video(photo_id):
+                    if len(text) <= 1024:
+                        sent_message = bot.send_video(channel_id, _open_media(photo_id), caption=text, parse_mode='HTML')
+                    else:
+                        bot.send_video(channel_id, _open_media(photo_id))
+                        sent_message = bot.send_message(channel_id, text, parse_mode='HTML')
+                elif len(text) <= 1024:
                     sent_message = bot.send_photo(channel_id, _open_media(photo_id), caption=text, parse_mode='HTML')
                 else:
                     bot.send_photo(channel_id, _open_media(photo_id))

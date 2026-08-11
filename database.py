@@ -194,6 +194,19 @@ def init_db():
                   created_at INTEGER,
                   updated_at INTEGER)''')
 
+    # История перехваченных постов (антиповтор: не качаем один пост дважды).
+    # unique по (source_username, message_id) — защита от повторной обработки.
+    # media_group_id позволяет группировать альбомы (все фото одного поста).
+    c.execute('''CREATE TABLE IF NOT EXISTS userbot_history
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  source_username TEXT,
+                  message_id INTEGER,
+                  media_group_id TEXT DEFAULT '',
+                  post_id INTEGER,
+                  status TEXT DEFAULT 'captured',
+                  created_at INTEGER,
+                  UNIQUE(source_username, message_id))''')
+
     # ================= SCHEDULES & PUBLICATIONS =================
     c.execute('''CREATE TABLE IF NOT EXISTS schedules
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -786,6 +799,56 @@ def userbot_get_last_message(username):
     r = c.fetchone()
     conn.close()
     return r[0] if r else 0
+
+
+# --- USERBOT история перехваченных постов (userbot_history) ---
+def userbot_history_add(source_username, message_id, media_group_id="", post_id=None, status='captured'):
+    """Фиксирует факт перехвата сообщения (антиповтор). Возвращает True если добавлено, False если уже было."""
+    conn = _connect()
+    c = conn.cursor()
+    now = int(time.time())
+    c.execute("INSERT OR IGNORE INTO userbot_history (source_username, message_id, media_group_id, post_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+              (source_username, int(message_id), media_group_id or "", post_id, status, now))
+    changed = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return changed
+
+def userbot_history_exists(source_username, message_id):
+    """True если сообщение уже перехвачено (любой статус)."""
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("SELECT 1 FROM userbot_history WHERE source_username = ? AND message_id = ?", (source_username, int(message_id)))
+    r = c.fetchone()
+    conn.close()
+    return r is not None
+
+def userbot_history_get(source_username, message_id):
+    """Запись истории (dict) или None."""
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("SELECT id, source_username, message_id, media_group_id, post_id, status, created_at FROM userbot_history WHERE source_username = ? AND message_id = ?",
+              (source_username, int(message_id)))
+    r = c.fetchone()
+    conn.close()
+    if not r:
+        return None
+    return {'id': r[0], 'source_username': r[1], 'message_id': r[2], 'media_group_id': r[3],
+            'post_id': r[4], 'status': r[5], 'created_at': r[6]}
+
+def userbot_history_list(limit=100, source_username=None):
+    """Последние перехваченные посты (для панели)."""
+    conn = _connect()
+    c = conn.cursor()
+    if source_username:
+        c.execute("SELECT id, source_username, message_id, media_group_id, post_id, status, created_at FROM userbot_history WHERE source_username = ? ORDER BY id DESC LIMIT ?",
+                  (source_username, limit))
+    else:
+        c.execute("SELECT id, source_username, message_id, media_group_id, post_id, status, created_at FROM userbot_history ORDER BY id DESC LIMIT ?", (limit,))
+    rows = [{'id': r[0], 'source_username': r[1], 'message_id': r[2], 'media_group_id': r[3],
+             'post_id': r[4], 'status': r[5], 'created_at': r[6]} for r in c.fetchall()]
+    conn.close()
+    return rows
 
 
 # --- Бэкапы БД ---

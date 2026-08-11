@@ -411,6 +411,22 @@
                         </table>
                     </div>
                 </div>
+                <div class="card p-3 mt-2">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="section-title mb-0">CAPTURE HISTORY</h5>
+                        <div class="ms-auto">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadUserbotHistory()">REFRESH</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive" style="max-height:300px; overflow-y:auto;">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr><th>POST</th><th>SOURCE</th><th>MSG</th><th>GROUP</th><th>STATUS</th><th>TIME</th></tr>
+                            </thead>
+                            <tbody id="userbot-history-table"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- ERRORS -->
@@ -563,7 +579,7 @@ sections.forEach(s => s.addEventListener('click', e => {
     if (s.dataset.sec === 'templates') loadTemplates();
     if (s.dataset.sec === 'scheduler') { loadTestMode(); loadCalendar(); }
     if (s.dataset.sec === 'publications') loadPublications();
-    if (s.dataset.sec === 'userbot') loadUserbot();
+    if (s.dataset.sec === 'userbot') { loadUserbot(); loadUserbotHistory(); }
     if (s.dataset.sec === 'analytics') loadAnalytics();
     if (s.dataset.sec === 'errors') loadErrors();
     if (s.dataset.sec === 'audit') loadAudit();
@@ -1106,6 +1122,27 @@ async function deleteUserbotSource(username) {
 async function toggleUserbotSource(username, enabled) {
     await api('/api/platform/userbot/sources/' + encodeURIComponent(username) + '/toggle',
         'POST', { enabled: enabled ? 1 : 0 });
+}
+
+async function loadUserbotHistory() {
+    const d = await api('/api/platform/userbot/history?limit=100');
+    const tbody = document.getElementById('userbot-history-table');
+    tbody.innerHTML = '';
+    if (!d.items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center small-text">NO CAPTURES YET</td></tr>';
+        return;
+    }
+    d.items.forEach(h => {
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td>${h.post_id ? '#' + h.post_id : '—'}</td>
+            <td class="post-preview">${h.source_username}</td>
+            <td>${h.message_id}</td>
+            <td>${h.media_group_id ? h.media_group_id.slice(0, 8) + '…' : '—'}</td>
+            <td><span class="badge bg-dark border border-secondary">${h.status}</span></td>
+            <td>${h.created_at ? new Date(h.created_at * 1000).toLocaleString() : '—'}</td>
+        </tr>`);
+    });
 }
 
 loadPosts();

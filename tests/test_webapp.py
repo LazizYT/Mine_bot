@@ -28,6 +28,7 @@ class TestPlatformAPI(unittest.TestCase):
         cur.execute("DELETE FROM channel_settings")
         cur.execute("DELETE FROM managed_channels")
         cur.execute("DELETE FROM userbot_sources")
+        cur.execute("DELETE FROM userbot_history")
         conn.commit()
         conn.close()
         self.client = webapp.app.test_client()
@@ -201,6 +202,15 @@ class TestPlatformAPI(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         r = self.client.get('/api/platform/userbot/sources')
         self.assertEqual(len(r.get_json()['items']), 0)
+
+    def test_userbot_history_api(self):
+        database.userbot_history_add('@src_channel', 100, 'grp1', post_id=5, status='captured')
+        r = self.client.get('/api/platform/userbot/history')
+        self.assertEqual(r.status_code, 200)
+        d = r.get_json()
+        self.assertIn('items', d)
+        self.assertEqual(len(d['items']), 1)
+        self.assertEqual(d['items'][0]['message_id'], 100)
 
 
 if __name__ == '__main__':
