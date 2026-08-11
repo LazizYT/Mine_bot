@@ -163,6 +163,20 @@ class TestPlatformAPI(unittest.TestCase):
         rows_filtered = database.get_audit_log(action='test_action')
         self.assertEqual(len(rows_filtered), 1)
 
+    def test_audit_pagination(self):
+        for i in range(5):
+            database.audit_log('bulk_test', f"item:{i}")
+        r = self.client.get('/api/platform/audit?page=1&per_page=2')
+        self.assertEqual(r.status_code, 200)
+        d = r.get_json()
+        self.assertEqual(len(d['items']), 2)
+        self.assertEqual(d['total'], 5)
+        self.assertGreaterEqual(d['pages'], 3)
+        r = self.client.get('/api/platform/audit?page=3&per_page=2')
+        self.assertEqual(len(r.get_json()['items']), 1)
+        r = self.client.get('/api/platform/audit?action=bulk_test&page=1&per_page=10')
+        self.assertEqual(r.get_json()['total'], 5)
+
 
 if __name__ == '__main__':
     unittest.main()

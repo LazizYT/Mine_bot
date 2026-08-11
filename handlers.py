@@ -51,8 +51,7 @@ def ensure_html_tags(text):
 
 def _channel_id_by_username(username):
     """Числовой id канала из managed_channels (или создаёт)."""
-    import sqlite3
-    conn = sqlite3.connect(database.DB_PATH)
+    conn = database._connect()
     cur = conn.cursor()
     cur.execute("SELECT id FROM managed_channels WHERE username = ?", (username,))
     row = cur.fetchone()

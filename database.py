@@ -10,8 +10,18 @@ from datetime import datetime, timedelta
 DB_PATH = os.getenv('DB_PATH', os.path.join('data', 'bot_data.db'))
 
 def _connect():
-    """Утилита: открыть соединение с БД (используется сервисными модулями)."""
-    return sqlite3.connect(DB_PATH)
+    """Утилита: открыть соединение с БД (используется сервисными модулями).
+
+    WAL-режим + busy_timeout — защита от "database is locked" при конкурентной
+    записи из нескольких потоков (Flask + APScheduler + бот).
+    """
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=10000")
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.Error:
+        pass
+    return conn
 
 def init_db():
     """Инициализация структуры базы данных при запуске приложения."""
@@ -19,7 +29,7 @@ def init_db():
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir)
         
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     
     # Таблица очереди постов: хранит медиа, текст, статус и время публикации
@@ -246,7 +256,7 @@ def init_db():
 
 def init_defaults():
     from ai_generator import PROMPT_TEMPLATE
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     # Промпт
     c.execute("SELECT COUNT(*) FROM ai_prompts")
@@ -265,7 +275,7 @@ def init_defaults():
 
 # --- Управление водяными знаками ---
 def add_watermark_db(path, name):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM watermarks")
     if c.fetchone()[0] >= 5:
@@ -277,7 +287,7 @@ def add_watermark_db(path, name):
     return True
 
 def get_all_watermarks():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT id, path, name, is_active FROM watermarks")
     rows = c.fetchall()
@@ -285,7 +295,7 @@ def get_all_watermarks():
     return rows
 
 def set_active_watermark(wm_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE watermarks SET is_active = 0")
     c.execute("UPDATE watermarks SET is_active = 1 WHERE id = ?", (wm_id,))
@@ -293,7 +303,7 @@ def set_active_watermark(wm_id):
     conn.close()
 
 def get_active_watermark():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT path FROM watermarks WHERE is_active = 1")
     res = c.fetchone()
@@ -301,7 +311,7 @@ def get_active_watermark():
     return res[0] if res else 'templates/logo.png'
 
 def delete_watermark(wm_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT path FROM watermarks WHERE id = ?", (wm_id,))
     path = c.fetchone()
@@ -314,7 +324,7 @@ def delete_watermark(wm_id):
 
 # --- Управление промптами ---
 def get_all_prompts():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT id, name, prompt, is_active FROM ai_prompts")
     rows = c.fetchall()
@@ -322,21 +332,21 @@ def get_all_prompts():
     return rows
 
 def add_prompt(name, prompt):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT INTO ai_prompts (name, prompt, is_active) VALUES (?, ?, 0)", (name, prompt))
     conn.commit()
     conn.close()
 
 def delete_prompt(prompt_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM ai_prompts WHERE id = ? AND is_active = 0", (prompt_id,))
     conn.commit()
     conn.close()
 
 def get_active_prompt():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT prompt, id FROM ai_prompts WHERE is_active = 1")
     res = c.fetchone()
@@ -344,7 +354,7 @@ def get_active_prompt():
     return res if res else (None, None)
 
 def activate_prompt(prompt_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE ai_prompts SET is_active = 0")
     c.execute("UPDATE ai_prompts SET is_active = 1 WHERE id = ?", (prompt_id,))
@@ -352,14 +362,14 @@ def activate_prompt(prompt_id):
     conn.close()
 
 def update_prompt(prompt_id, name, prompt):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE ai_prompts SET name = ?, prompt = ? WHERE id = ?", (name, prompt, prompt_id))
     conn.commit()
     conn.close()
 
 def update_active_prompt(new_prompt):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE ai_prompts SET prompt = ? WHERE is_active = 1", (new_prompt,))
     conn.commit()
@@ -367,14 +377,14 @@ def update_active_prompt(new_prompt):
 
 # --- Глобальные настройки ---
 def set_global_setting(key, value):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)", (key, str(value)))
     conn.commit()
     conn.close()
 
 def get_global_setting(key, default=""):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT value FROM global_settings WHERE key = ?", (key,))
     result = c.fetchone()
@@ -383,7 +393,7 @@ def get_global_setting(key, default=""):
 
 # --- Управление каналами ---
 def add_channel(username):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     try:
         c.execute("INSERT OR IGNORE INTO managed_channels (username) VALUES (?)", (username,))
@@ -391,14 +401,14 @@ def add_channel(username):
     finally: conn.close()
 
 def remove_channel(username):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM managed_channels WHERE username = ?", (username,))
     conn.commit()
     conn.close()
 
 def get_all_managed_channels():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT username FROM managed_channels")
     rows = c.fetchall()
@@ -408,14 +418,14 @@ def get_all_managed_channels():
 # --- Статистика ---
 def save_sub_count(channel_id, count):
     date = datetime.now().strftime('%Y-%m-%d')
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO stats_subscribers (channel_id, count, date) VALUES (?, ?, ?)", (channel_id, count, date))
     conn.commit()
     conn.close()
 
 def get_sub_history(channel_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT date, count FROM stats_subscribers WHERE channel_id = ? ORDER BY date ASC LIMIT 30", (channel_id,))
     rows = c.fetchall()
@@ -424,7 +434,7 @@ def get_sub_history(channel_id):
 
 def save_post_views(post_id, views):
     date = datetime.now().strftime('%Y-%m-%d')
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO stats_posts (post_id, views, date) VALUES (?, ?, ?)", (post_id, views, date))
     conn.commit()
@@ -432,14 +442,14 @@ def save_post_views(post_id, views):
 
 # --- Настройки пользователя ---
 def update_user_setting(user_id, key, value):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)", (user_id, key, str(value)))
     conn.commit()
     conn.close()
 
 def get_user_setting(user_id, key, default=None):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT value FROM user_settings WHERE user_id = ? AND key = ?", (user_id, key))
     result = c.fetchone()
@@ -448,7 +458,7 @@ def get_user_setting(user_id, key, default=None):
 
 # --- Очередь ---
 def add_to_queue(photo_id, text, document_id=None, channel_id=None, scheduled_time=None):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT INTO queue (photo_id, text, document_id, channel_id, scheduled_time) VALUES (?, ?, ?, ?, ?)", 
               (photo_id, text, document_id, channel_id, scheduled_time))
@@ -456,7 +466,7 @@ def add_to_queue(photo_id, text, document_id=None, channel_id=None, scheduled_ti
     conn.close()
 
 def get_ready_posts():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     current_time = int(time.time())
     c.execute('''SELECT id, photo_id, text, document_id, channel_id FROM queue 
@@ -467,21 +477,21 @@ def get_ready_posts():
     return rows
 
 def update_message_id(post_id, message_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE queue SET message_id = ? WHERE id = ?", (message_id, post_id))
     conn.commit()
     conn.close()
 
 def mark_as_posted(post_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE queue SET status='posted' WHERE id=?", (post_id,))
     conn.commit()
     conn.close()
 
 def get_published_history(limit=50):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("""SELECT id, photo_id, text, channel_id, scheduled_time, message_id 
                  FROM queue 
@@ -493,7 +503,7 @@ def get_published_history(limit=50):
 
 def get_stats():
     import pytz
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM queue")
     total = c.fetchone()[0]
@@ -509,7 +519,7 @@ def get_stats():
     return {'total': total, 'published': published, 'queue': queue_count, 'today': today}
 
 def get_all_pending():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT id, photo_id, text, document_id, channel_id, scheduled_time FROM queue WHERE status='pending' ORDER BY scheduled_time ASC")
     rows = c.fetchall()
@@ -517,7 +527,7 @@ def get_all_pending():
     return rows
 
 def get_all_posts():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT * FROM queue")
     rows = c.fetchall()
@@ -525,7 +535,7 @@ def get_all_posts():
     return rows
 
 def get_post_by_id(post_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT id, photo_id, text, document_id, channel_id, scheduled_time, status FROM queue WHERE id = ?", (post_id,))
     row = c.fetchone()
@@ -533,21 +543,21 @@ def get_post_by_id(post_id):
     return row
 
 def update_post_content(post_id, text, scheduled_time):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("UPDATE queue SET text = ?, scheduled_time = ? WHERE id = ?", (text, scheduled_time, post_id))
     conn.commit()
     conn.close()
 
 def delete_from_queue(post_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM queue WHERE id=?", (post_id,))
     conn.commit()
     conn.close()
 
 def get_pending_posts():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT id, scheduled_time FROM queue WHERE status='pending' ORDER BY scheduled_time ASC")
     rows = c.fetchall()
@@ -556,7 +566,7 @@ def get_pending_posts():
 
 def get_last_scheduled_time():
     """Возвращает максимальное scheduled_time среди ожидающих постов (или None, если очередь пуста)."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT MAX(scheduled_time) FROM queue WHERE status='pending'")
     res = c.fetchone()
@@ -564,7 +574,7 @@ def get_last_scheduled_time():
     return res[0] if res else None
 
 def update_post_times(updates):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     for post_id, scheduled_time in updates.items():
         c.execute("UPDATE queue SET scheduled_time = ? WHERE id = ?", (scheduled_time, post_id))
@@ -573,7 +583,7 @@ def update_post_times(updates):
 
 
 def record_published_post(photo_id, text, document_id, channel_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     current_time = int(time.time())
     c.execute("INSERT INTO queue (photo_id, text, document_id, channel_id, scheduled_time, status) VALUES (?, ?, ?, ?, ?, 'posted')", 
@@ -582,14 +592,14 @@ def record_published_post(photo_id, text, document_id, channel_id):
     conn.close()
 
 def save_comment(user_name, text, timestamp):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT INTO comments (user_name, text, timestamp) VALUES (?, ?, ?)", (user_name, text, timestamp))
     conn.commit()
     conn.close()
 
 def get_all_comments(limit=200):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT user_name, text FROM comments ORDER BY timestamp ASC LIMIT ?", (limit,))
     rows = c.fetchall()
@@ -597,7 +607,7 @@ def get_all_comments(limit=200):
     return rows
 
 def clear_comments():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM comments")
     conn.commit()
@@ -605,7 +615,7 @@ def clear_comments():
 
 # --- Черновики (переживают рестарт бота) ---
 def save_draft(user_id, photo, text, document, channel):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO drafts (user_id, photo, text, document, channel, updated) VALUES (?, ?, ?, ?, ?, ?)",
               (user_id, photo, text, document, channel, int(time.time())))
@@ -613,7 +623,7 @@ def save_draft(user_id, photo, text, document, channel):
     conn.close()
 
 def get_user_draft(user_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT photo, text, document, channel FROM drafts WHERE user_id = ?", (user_id,))
     row = c.fetchone()
@@ -621,7 +631,7 @@ def get_user_draft(user_id):
     return {'photo': row[0], 'text': row[1], 'document': row[2], 'channel': row[3]} if row else None
 
 def delete_draft(user_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM drafts WHERE user_id = ?", (user_id,))
     conn.commit()
@@ -631,7 +641,7 @@ def delete_draft(user_id):
 def get_post_stats():
     """Возвращает количество опубликованных постов: всего, сегодня, за неделю и за месяц."""
     import pytz
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM queue WHERE status='posted'")
     total = c.fetchone()[0]
@@ -665,14 +675,14 @@ def get_post_stats():
 
 # --- Память ИИ (ручные заметки админа) ---
 def add_memory_note(note):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT INTO ai_memory (note, created_at) VALUES (?, ?)", (note, int(time.time())))
     conn.commit()
     conn.close()
 
 def get_memory_notes():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("SELECT id, note, created_at FROM ai_memory ORDER BY created_at DESC")
     rows = c.fetchall()
@@ -680,14 +690,14 @@ def get_memory_notes():
     return rows
 
 def delete_memory_note(note_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM ai_memory WHERE id = ?", (note_id,))
     conn.commit()
     conn.close()
 
 def clear_memory_notes():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("DELETE FROM ai_memory")
     conn.commit()
@@ -696,7 +706,7 @@ def clear_memory_notes():
 # --- Аудит (audit_log) ---
 def audit_log(action, target='', old_value='', new_value='', user='admin'):
     """Записывает действие в audit_log."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     c.execute("INSERT INTO audit_log (user, action, target, old_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?)",
               (user, action, target, old_value, new_value, int(time.time())))
@@ -705,7 +715,7 @@ def audit_log(action, target='', old_value='', new_value='', user='admin'):
 
 def get_audit_log(limit=200, action=None):
     """История аудита. Фильтр по action (опционально)."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     c = conn.cursor()
     if action:
         c.execute("SELECT id, user, action, target, old_value, new_value, created_at FROM audit_log WHERE action = ? ORDER BY id DESC LIMIT ?", (action, limit))
@@ -715,5 +725,42 @@ def get_audit_log(limit=200, action=None):
     conn.close()
     return [{'id': r[0], 'user': r[1], 'action': r[2], 'target': r[3],
              'old_value': r[4], 'new_value': r[5], 'created_at': r[6]} for r in rows]
+
+
+# --- Бэкапы БД ---
+import shutil
+
+BACKUP_DIR = os.path.join(os.path.dirname(DB_PATH), 'backups')
+BACKUP_KEEP = 14  # храним 14 последних бэкапов
+
+
+def backup_db(keep=BACKUP_KEEP):
+    """Ежедневный бэкап БД (SQLite online backup API, безопасен при WAL).
+    Возвращает путь к созданному бэкапу или None при ошибке."""
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        ts = time.strftime('%Y%m%d_%H%M%S')
+        dest = os.path.join(BACKUP_DIR, f'bot_data_{ts}.db')
+        src = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(dest)
+        with dst:
+            src.backup(dst)
+        dst.close()
+        src.close()
+        _prune_backups(keep)
+        return dest
+    except Exception as e:
+        print(f"❌ Ошибка бэкапа БД: {e}")
+        return None
+
+
+def _prune_backups(keep):
+    try:
+        backups = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith('bot_data_') and f.endswith('.db')])
+        while len(backups) > keep:
+            os.remove(os.path.join(BACKUP_DIR, backups.pop(0)))
+    except Exception as e:
+        print(f"❌ Ошибка чистки бэкапов: {e}")
+
 
 init_db()

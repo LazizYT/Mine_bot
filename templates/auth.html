@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MINE_BOT_OS | ВХОД</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --bg: #0a0a0a; --card: #141414; --mc: #388e3c; --neon-p: #bc13fe; --neon-g: #39ff14; --white: #fff; }
+        body { background: var(--bg); color: var(--white); font-family: 'Minecraftia', monospace; display: flex; align-items: center; justify-content: center; min-height: 100vh; letter-spacing: 1px; }
+        .card { background: var(--card); border: 3px solid var(--neon-p); border-radius: 0; width: 100%; max-width: 380px; padding: 30px; box-shadow: 0 0 30px rgba(188,19,254,.3); }
+        .btn-mc { border-radius: 0; text-transform: uppercase; font-size: .75rem; border-width: 2px; }
+        .btn-primary-mc { border-color: var(--neon-g); color: var(--neon-g); background: transparent; }
+        .btn-primary-mc:hover { background: var(--neon-g); color: #000; }
+        .form-control { background: #111 !important; color: #fff !important; border-radius: 0; border: 1px solid #444; }
+        .form-control:focus { border-color: var(--neon-p); box-shadow: 0 0 10px rgba(188,19,254,.5); }
+        h1 { color: var(--neon-g); text-shadow: 0 0 10px var(--neon-g); font-size: 1.2rem; }
+        .err { color: #ff0033; font-size: .7rem; min-height: 1em; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1 class="text-center mb-3">🔐 MINE_OS PANEL</h1>
+    <p class="text-center" style="color:#888;font-size:.7rem;">Вход только для владельца</p>
+    <div id="tg-zone" class="text-center">
+        <button class="btn btn-primary-mc btn-mc px-4" id="btn-tg" onclick="tgLogin()">ВОЙТИ ЧЕРЕЗ TELEGRAM</button>
+        <div class="mt-2" style="font-size:.6rem;color:#888;">Если кнопка не сработала — открой панель из бота (кнопка Studio)</div>
+    </div>
+    <hr style="border-color:#333;">
+    <div class="mb-2"><label style="font-size:.7rem;">LOGIN</label>
+        <input class="form-control" id="login" value="{{ config.PANEL_USER }}"></div>
+    <div class="mb-2"><label style="font-size:.7rem;">PASSWORD</label>
+        <input class="form-control" id="password" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-purple-mc btn-mc w-100" onclick="basicLogin()">ВОЙТИ ПО ПАРОЛЮ</button>
+    <div class="err text-center mt-2" id="err"></div>
+</div>
+
+<script>
+    const next = new URLSearchParams(location.search).get('next') || '/';
+
+    function showErr(m) { document.getElementById('err').textContent = m || ''; }
+
+    function tgLogin() {
+        const tg = window.Telegram && window.Telegram.WebApp;
+        if (!tg || !tg.initData) { showErr('Нет данных Telegram. Откройте панель через бота.'); return; }
+        tg.ready();
+        fetch('/api/auth/tg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: tg.initData })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'success') { location.href = next; }
+            else showErr('Доступ запрещён: вы не владелец панели.');
+        }).catch(() => showErr('Ошибка сети'));
+    }
+
+    function basicLogin() {
+        const login = document.getElementById('login').value;
+        const password = document.getElementById('password').value;
+        if (!password) { showErr('Введите пароль'); return; }
+        fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: login, password: password })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'success') { location.href = next; }
+            else showErr('Неверный логин или пароль');
+        }).catch(() => showErr('Ошибка сети'));
+    }
+
+    // Автологин через Telegram, если панель открыта внутри Telegram WebApp
+    (function() {
+        const tg = window.Telegram && window.Telegram.WebApp;
+        if (tg && tg.initData) { tgLogin(); }
+    })();
+</script>
+</body>
+</html>

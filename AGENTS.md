@@ -20,7 +20,7 @@ opencode сразу знал контекст.
 
 ## Обязательные env-переменные (файл `.env`, НЕ коммитится)
 
-- `TELEGRAM_TOKEN` (обязательная), `GROQ_API_KEY`, `GEMINI_KEY`, `CHANNELS` (фактически `@lazikosmods`), `PORT` (дефолт 8080). Опционально `PANEL_USER`/`PANEL_PASSWORD` (Basic-авторизация панели).
+- `TELEGRAM_TOKEN` (обязательная), `GROQ_API_KEY`, `GEMINI_KEY`, `CHANNELS` (фактически `@lazikosmods`), `PORT` (дефолт 8080). Опционально `PANEL_USER`/`PANEL_PASSWORD` (запасной вход по паролю; на проде заданы), `PANEL_AUTH_REQUIRED` (дефолт 1 — авторизация ОБЯЗАТЕЛЬНА).
 - CurseForge удалён полностью (env `CURSEFORGE_API_KEY` больше не читается).
 - `ADMIN_IDS` задаётся в `config.py`, а не в env.
 - `DB_PATH` — путь к SQLite (дефолт `data/bot_data.db` относительно рабочей папки → в контейнере `/app/data/bot_data.db`, на volume).
@@ -39,6 +39,17 @@ opencode сразу знал контекст.
 - ВАЖНО: MCP подхватывается только после перезапуска opencode.
 
 ## Последние фиксы (сделаны)
+
+0. **ХАРДЕНИНГ + РЕФАКТОРИНГ (2026-08-11)**:
+   - **Панель теперь ТОЛЬКО для владельца**: `config.ADMIN_IDS = [8641832514]` (user id пользователя). Новая авторизация: `panel_auth.py` (валидация Telegram WebApp initData по HMAC + подписанные сессионные cookie `panel_session`). Вход через кнопку Studio в боте (WebApp initData) ИЛИ по логину/паролю (`/api/auth/login`). Включена ОБЯЗАТЕЛЬНО (`PANEL_AUTH_REQUIRED=1` по умолчанию; отключается только `PANEL_AUTH_REQUIRED=0` для тестов). Неавторизованные: HTML → редирект на `/auth`, API → 401.
+   - **SQLite WAL**: `database._connect()` теперь `PRAGMA journal_mode=WAL` + `busy_timeout=10000` + `timeout=15` — защита от "database is locked" при конкурентной записи. Все прямые `sqlite3.connect(DB_PATH)` заменены на `_connect()`.
+   - **waitress**: prod-сервер вместо Flask dev server (`waitress.serve(threads=8)`, fallback на `app.run`). Добавлен в requirements.txt.
+   - **Blueprints**: `webapp.py` ужат до фабрики приложения (82 маршрута); логика разнесена: `web_helpers.py` (общие хелперы + auth-гейт), `web_blueprints/auth.py`, `web_blueprints/main.py` (дашборд + legacy API), `web_blueprints/platform.py` (/api/platform/*). Тесты не сломаны.
+   - **Бэкапы БД**: `database.backup_db()` (SQLite online backup API, безопасен при WAL) в `data/backups/`, хранит 14 копий, ежедневно в 03:05 (джоб в `main.py`).
+   - **Тесты при сборке**: Dockerfile теперь запускает `python -m unittest` (dummy env-токены на время сборки) — сломанный код не доедет до деплоя. Всего **62 теста OK** (включая `test_panel_auth.py` — 7 тестов, и пагинация audit).
+   - **Пагинация AUDIT** в /platform: `/api/platform/audit` принимает `page`/`per_page`/`action` и возвращает `total`/`pages`; в панели PREV/NEXT + счётчик.
+   - **ПРОД-ENV ИСПРАВЛЕН**: было `CHANNELS=@lazikomods` (без 's'!) → исправлено на `@lazikosmods`. Добавлены `PANEL_USER=admin` + `PANEL_PASSWORD` (запасной вход по паролю).
+   - **Проблема**: панель теперь требует авторизации — при первом открытии через Telegram WebApp покажется страница входа с кнопкой "ВОЙТИ ЧЕРЕЗ TELEGRAM" (автоматически). Если открывать из обычного браузера — логин/пароль.
 
 0. **CONTENT DISTRIBUTION PLATFORM (2026-08-11, фазы 1-8)**:
    - **Новые модули**: `content_storage.py` (Content Storage: CRUD постов, дедуп по content_hash, reuse-логика, селекторы random/weighted/fifo/lifo/least_used/category_rotation/smart, `select_post`, `storage_stats`), `channel_manager.py` (настройки каналов `ensure/get/save/get_all/channel_table`, сети `create/get/rename/delete/add_channel/pause_network/is_network_paused/clone_network`, шаблоны `create/get/delete/apply_template`, bulk `bulk_update`, `clone_settings`, `delete_channel`), `scheduler_engine.py` (test_mode, `compute_next_run` interval/cron+tz, `find_due_channels`, `build_channel_settings`, `add_to_storage_and_queue`, `select_best_post`, `run_scheduler(dry_run)`, `retry_failed`, `log_publication`, `log_event`, `notify_admin`, `publication_history`, `analytics`, `calendar_events`).

@@ -269,6 +269,13 @@
                             <tbody id="audit-table"></tbody>
                         </table>
                     </div>
+                    <div class="d-flex align-items-center mt-2">
+                        <small class="small-text" id="audit-pager"></small>
+                        <div class="ms-auto">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadAudit(-1)">PREV</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadAudit(1)">NEXT</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -826,19 +833,22 @@ async function loadErrors() {
 }
 
 // ---------- AUDIT ----------
-let auditActions = new Set();
-async function loadAudit() {
-    const d = await api('/api/platform/audit?limit=300');
+let auditPage = 1, auditTotal = 0, auditActions = new Set();
+async function loadAudit(delta = 0) {
+    auditPage += delta;
+    if (auditPage < 1) auditPage = 1;
     const sel = document.getElementById('audit-action');
     const oldVal = sel.value;
-    d.items.forEach(i => auditActions.add(i.action));
+    let url = `/api/platform/audit?page=${auditPage}&per_page=100`;
+    if (oldVal) url += `&action=${encodeURIComponent(oldVal)}`;
+    const d = await api(url);
+    auditActions = new Set(d.items.map(i => i.action).concat([...auditActions]));
     const opts = ['<option value="">ALL ACTIONS</option>'] + [...auditActions].sort().map(a =>
         `<option ${a === oldVal ? 'selected' : ''}>${a}</option>`).join('');
     if (sel.innerHTML !== opts) sel.innerHTML = opts;
-    const filtered = oldVal ? d.items.filter(i => i.action === oldVal) : d.items;
     const tbody = document.getElementById('audit-table');
     tbody.innerHTML = '';
-    filtered.forEach(i => {
+    d.items.forEach(i => {
         tbody.insertAdjacentHTML('beforeend', `
         <tr>
             <td>#${i.id}</td>
@@ -848,7 +858,8 @@ async function loadAudit() {
             <td>${new Date(i.created_at * 1000).toLocaleString()}</td>
         </tr>`);
     });
-    if (!filtered.length) tbody.innerHTML = '<tr><td colspan="5" class="text-center small-text py-4">NO AUDIT RECORDS</td></tr>';
+    if (!d.items.length) tbody.innerHTML = '<tr><td colspan="5" class="text-center small-text py-4">NO AUDIT RECORDS</td></tr>';
+    document.getElementById('audit-pager').textContent = `Page ${d.page}/${d.pages || 1} • Total ${d.total}`;
 }
 
 // ---------- EVENTS ----------

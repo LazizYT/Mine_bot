@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ADMIN_IDS = [5703605946] # Твой ID администратора
+ADMIN_IDS = [8641832514]  # Твой ID администратора — доступ к панели только у этого аккаунта
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -24,6 +24,8 @@ WATERMARK_TEXT = os.getenv("WATERMARK_TEXT", "@lazikosmods")
 
 PANEL_USER = os.getenv("PANEL_USER", "admin")
 PANEL_PASSWORD = os.getenv("PANEL_PASSWORD", "")
+# Обязательная авторизация панели. По умолчанию ВКЛ — панель больше не открыта миру.
+PANEL_AUTH_REQUIRED = os.getenv("PANEL_AUTH_REQUIRED", "1").lower() in ("1", "true", "yes", "on")
 
 # 🧠 НОВАЯ НАСТРОЙКА: Интервал умной очереди (в часах)
 SMART_QUEUE_INTERVAL_HOURS = 6

@@ -29,6 +29,8 @@ scheduler.add_job(publisher.auto_ask_suggestions, 'interval', days=3, args=[bot]
 scheduler.add_job(publisher.check_subscriber_drop, 'interval', hours=6, args=[bot])
 # Ретраи упавших публикаций
 scheduler.add_job(scheduler_engine.retry_failed, 'interval', minutes=30, args=[bot])
+# Ежедневный бэкап БД (хранятся в data/backups, volume переживает рестарты)
+scheduler.add_job(database.backup_db, 'cron', hour=3, minute=5)
 scheduler.start()
 
 # Запуск Web Dashboard в отдельном потоке
