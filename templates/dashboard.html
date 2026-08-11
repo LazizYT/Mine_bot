@@ -4,53 +4,247 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MINE_BOT_OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
-    <link href="https://fonts.cdnfonts.com/css/minecraftia" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #0a0a0a; --card: #141414; --mc: #388e3c; --neon-p: #bc13fe; --neon-g: #39ff14; --white: #fff; --text-main: #ffffff; }
-        body { background: var(--bg); color: var(--text-main); font-family: 'Minecraftia', sans-serif; letter-spacing: 1px; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: var(--mc); }
-        .navbar { background: #000 !important; border-bottom: 3px solid var(--neon-p); box-shadow: 0 0 20px rgba(188, 19, 254, 0.3); }
-        .navbar-brand { color: var(--neon-g) !important; text-shadow: 0 0 5px var(--neon-g); font-size: 1.2rem; }
-        .nav-logo { height: 35px; margin-right: 12px; image-rendering: pixelated; }
-        .card { background: var(--card); border: 2px solid #2a2a2a; border-radius: 0; transition: all 0.3s ease; margin-bottom: 20px; }
-        .card:hover { border-color: var(--neon-p); box-shadow: 0 0 15px rgba(188, 19, 254, 0.2); transform: translateY(-3px); }
-        .stats-card { border-color: var(--neon-p); text-align: center; }
-        .stats-label { color: #fff !important; font-size: 0.6rem; text-shadow: 0 0 5px #fff; margin-top: 4px; }
-        .stats-num { font-size: 2rem; font-weight: bold; color: var(--neon-g); text-shadow: 0 0 10px var(--neon-g); }
-        .btn-mc { border-radius: 0; text-transform: uppercase; font-size: 0.65rem; border-width: 2px; }
-        .btn-primary-mc { border-color: var(--neon-g); color: var(--neon-g); background: transparent; }
-        .btn-primary-mc:hover { background: var(--neon-g); color: #000; }
-        .btn-purple-mc { border-color: var(--neon-p); color: var(--neon-p); background: transparent; }
-        .btn-purple-mc:hover { background: var(--neon-p); color: #fff; }
-        .btn-danger-mc { border-color: #ff0033; color: #ff0033; background: transparent; }
-        .nav-tabs .nav-link { color: #888; border: none; font-size: 0.7rem; }
-        .nav-tabs .nav-link.active { background: transparent; color: var(--neon-p); border-bottom: 3px solid var(--neon-p); }
-        .post-media { height: 180px; position: relative; background: #000; overflow: hidden; }
+        :root {
+            --bg0: #07090d;
+            --bg1: #0b1017;
+            --panel: rgba(19, 27, 39, 0.62);
+            --panel-solid: #111826;
+            --line: rgba(148, 163, 184, 0.14);
+            --line-strong: rgba(148, 163, 184, 0.30);
+            --text: #dbe4ee;
+            --muted: #7e8ca0;
+            --cyan: #22d3ee;
+            --cyan-soft: rgba(34, 211, 238, 0.14);
+            --neon-g: #3ef0cf;
+            --neon-p: #a78bfa;
+            --ok: #34d399;
+            --warn: #fbbf24;
+            --bad: #fb5e6e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background:
+                radial-gradient(1100px 700px at 85% -10%, rgba(34, 211, 238, 0.10), transparent 60%),
+                radial-gradient(1000px 700px at -10% 110%, rgba(167, 139, 250, 0.08), transparent 60%),
+                linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+                var(--bg0);
+            background-size: auto, auto, 44px 44px, 44px 44px, auto;
+            background-attachment: fixed;
+            color: var(--text);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 14px;
+            letter-spacing: 0.02em;
+        }
+        ::selection { background: var(--cyan-soft); color: #fff; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg1); }
+        ::-webkit-scrollbar-thumb { background: #223044; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2e4059; }
+
+        .navbar {
+            background: rgba(8, 12, 18, 0.82) !important;
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--line);
+            box-shadow: 0 1px 0 rgba(34, 211, 238, 0.15), 0 12px 30px rgba(0,0,0,0.35);
+            position: relative;
+        }
+        .navbar::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: -1px; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(34,211,238,0.55), transparent);
+        }
+        .navbar-brand {
+            color: var(--text) !important;
+            font-family: 'Chakra Petch', sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            font-size: 1.05rem;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .navbar-brand .brand-dot { color: var(--cyan); text-shadow: 0 0 12px rgba(34,211,238,0.8); }
+        .nav-logo { height: 34px; width: 34px; object-fit: contain; filter: drop-shadow(0 0 8px rgba(34,211,238,0.45)); }
+        .sys-chip {
+            font-size: 0.62rem; letter-spacing: 0.12em; color: var(--ok);
+            border: 1px solid rgba(52, 211, 153, 0.35);
+            background: rgba(52, 211, 153, 0.08);
+            padding: 4px 10px; border-radius: 999px;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .sys-chip::before {
+            content: ""; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--ok); box-shadow: 0 0 8px var(--ok);
+            animation: pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+        .card {
+            background: linear-gradient(180deg, rgba(28, 38, 54, 0.55), rgba(14, 21, 33, 0.6));
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.30);
+            transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+            margin-bottom: 20px;
+        }
+        .card:hover {
+            border-color: rgba(34, 211, 238, 0.45);
+            box-shadow: 0 0 0 1px rgba(34,211,238,0.12), 0 14px 34px rgba(0,0,0,0.42);
+            transform: translateY(-2px);
+        }
+        .stats-card { border-color: var(--line-strong); text-align: center; position: relative; overflow: hidden; }
+        .stats-card::before {
+            content: ""; position: absolute; top: 0; left: 12%; right: 12%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+        }
+        .stats-card:hover::before { box-shadow: 0 0 12px var(--cyan); }
+        .stats-label {
+            color: var(--muted) !important; font-size: 0.6rem; letter-spacing: 0.18em;
+            text-transform: uppercase; margin-top: 6px;
+        }
+        .stats-num {
+            font-size: 2.1rem; font-weight: 600; color: var(--cyan);
+            text-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
+            font-family: 'Chakra Petch', sans-serif; line-height: 1.1;
+        }
+
+        .nav-tabs { border-bottom: 1px solid var(--line); margin-bottom: 20px; gap: 2px; }
+        .nav-tabs .nav-link {
+            color: var(--muted); border: 1px solid transparent; border-bottom: none;
+            font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+            border-radius: 8px 8px 0 0; padding: 9px 16px; transition: all 0.2s ease;
+            background: transparent;
+        }
+        .nav-tabs .nav-link:hover { color: var(--text); background: rgba(148,163,184,0.06); }
+        .nav-tabs .nav-link.active {
+            color: var(--cyan); background: rgba(34,211,238,0.07);
+            border-color: var(--line); border-bottom: 2px solid var(--cyan);
+            text-shadow: 0 0 10px rgba(34,211,238,0.5);
+        }
+        .tab-pane { background: transparent; color: var(--text); }
+
+        .btn-mc {
+            border-radius: 8px; text-transform: uppercase; font-size: 0.66rem;
+            letter-spacing: 0.12em; border-width: 1px; padding: 7px 14px;
+            background: transparent; transition: all 0.2s ease; font-weight: 600;
+        }
+        .btn-primary-mc { border-color: var(--cyan); color: var(--cyan); }
+        .btn-primary-mc:hover { background: var(--cyan); color: #06121a; box-shadow: 0 0 18px rgba(34,211,238,0.5); }
+        .btn-purple-mc { border-color: var(--neon-p); color: var(--neon-p); }
+        .btn-purple-mc:hover { background: var(--neon-p); color: #0b0a16; box-shadow: 0 0 18px rgba(167,139,250,0.45); }
+        .btn-danger-mc { border-color: var(--bad); color: var(--bad); }
+        .btn-danger-mc:hover { background: var(--bad); color: #180608; box-shadow: 0 0 18px rgba(251,94,110,0.5); }
+        .btn-mc:disabled { opacity: 0.45; pointer-events: none; }
+
+        .post-media { height: 180px; position: relative; background: #06090d; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; }
         .post-media img { width: 100%; height: 100%; object-fit: cover; }
-        .badge-files { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.8); border: 1px solid var(--neon-g); color: var(--neon-g); padding: 2px 6px; font-size: 0.55rem; z-index: 5; }
-        .handle { cursor: grab; background: #1a1a1a; color: var(--mc); font-size: 0.55rem; text-align: center; padding: 4px; border-bottom: 1px solid #333; }
-        .lang-btn { flex: 1; border: 2px solid #333; color: #888; background: transparent; padding: 10px; cursor: pointer; }
-        .lang-btn.active { border-color: var(--neon-g); color: var(--neon-g); text-shadow: 0 0 5px var(--neon-g); }
-        .modal-content { background: #000; border: 3px solid var(--neon-p); border-radius: 0; }
-        .form-control { background: #111 !important; color: #fff !important; border-radius: 0; border: 1px solid #444; font-family: monospace; }
-        .form-control:focus { background: #1a1a1a !important; color: #fff !important; border-color: var(--neon-p); box-shadow: 0 0 10px rgba(188, 19, 254, 0.5); outline: none; }
-        .tab-pane { background: var(--bg); color: #fff; }
-        .ai-summary { background: #111; border: 1px dashed var(--neon-p); padding: 15px; font-size: 0.75rem; white-space: pre-wrap; line-height: 1.6; }
-        .comment-item { border-left: 3px solid var(--neon-g); padding-left: 12px; margin-bottom: 10px; font-size: 0.7rem; color: #fff; }
-        .text-muted { color: #ccc !important; }
-        label { color: #fff !important; }
+        .badge-files {
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(6, 9, 13, 0.82); border: 1px solid var(--cyan);
+            color: var(--cyan); padding: 2px 7px; font-size: 0.6rem;
+            border-radius: 6px; z-index: 5; backdrop-filter: blur(4px);
+        }
+        .handle {
+            cursor: grab; background: rgba(30, 41, 59, 0.5); color: var(--muted);
+            font-size: 0.58rem; letter-spacing: 0.12em; text-align: center; padding: 5px;
+            border: 1px dashed var(--line-strong); border-radius: 6px;
+        }
+        .handle:active { cursor: grabbing; }
+
+        .badge { font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 0.62rem; letter-spacing: 0.06em; }
+        .badge.bg-dark, .badge.bg-secondary {
+            background: rgba(148,163,184,0.10) !important;
+            border: 1px solid var(--line-strong) !important;
+            color: var(--text) !important;
+        }
+
+        .lang-btn {
+            flex: 1; border: 1px solid var(--line-strong); color: var(--muted);
+            background: transparent; padding: 10px; cursor: pointer; border-radius: 8px;
+            font-size: 0.7rem; letter-spacing: 0.1em; transition: all 0.2s ease;
+        }
+        .lang-btn:hover { color: var(--text); border-color: var(--cyan); }
+        .lang-btn.active {
+            border-color: var(--cyan); color: var(--cyan);
+            background: var(--cyan-soft); box-shadow: 0 0 14px rgba(34,211,238,0.25);
+            text-shadow: 0 0 8px rgba(34,211,238,0.6);
+        }
+
+        .modal-content {
+            background: linear-gradient(180deg, #131b28, #0d1420);
+            border: 1px solid var(--line-strong);
+            border-radius: 14px; box-shadow: 0 0 0 1px rgba(34,211,238,0.1), 0 24px 60px rgba(0,0,0,0.6);
+        }
+        .modal-header, .modal-footer { border-color: var(--line); }
+        .modal-header h6, .modal-title { color: var(--cyan); font-family: 'Chakra Petch', sans-serif; letter-spacing: 0.1em; }
+        .btn-close { filter: invert(0.9); }
+
+        .form-control, .form-select {
+            background: rgba(8, 12, 18, 0.7) !important; color: var(--text) !important;
+            border: 1px solid var(--line-strong); border-radius: 8px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem;
+        }
+        .form-control:focus, .form-select:focus {
+            background: rgba(10, 15, 22, 0.9) !important; color: #fff !important;
+            border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34,211,238,0.15);
+            outline: none;
+        }
+        .form-control::placeholder { color: #5a6a7d; }
+
+        .ai-summary {
+            background: rgba(13, 19, 28, 0.7); border: 1px dashed var(--cyan);
+            padding: 15px; font-size: 0.72rem; white-space: pre-wrap; line-height: 1.7;
+            border-radius: 10px; color: var(--text);
+        }
+        .comment-item {
+            border-left: 2px solid var(--cyan); padding-left: 12px; margin-bottom: 10px;
+            font-size: 0.72rem; color: var(--text);
+        }
+        .text-muted, .text-white-50 { color: var(--muted) !important; }
+        label { color: var(--text) !important; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+
+        .list-group-item { background: transparent; border-color: var(--line); color: var(--text); }
+        .list-group-item:hover { background: rgba(148,163,184,0.04); }
+
+        .table { font-size: 0.7rem; color: var(--text); --bs-table-bg: transparent; --bs-table-color: var(--text); --bs-table-border-color: var(--line); }
+        .table th { color: var(--cyan); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; letter-spacing: 0.12em; border-color: var(--line); }
+        .table td { border-color: var(--line); vertical-align: middle; color: var(--text); }
+        .table-hover tbody tr { transition: background 0.15s ease; }
+        .table-hover tbody tr:hover { --bs-table-hover-bg: rgba(34,211,238,0.05); }
+        .table-dark { --bs-table-bg: transparent; }
+        .text-success { color: var(--ok) !important; }
+        code { color: var(--cyan); background: rgba(34,211,238,0.08); padding: 1px 5px; border-radius: 4px; }
+
+        .section-title {
+            font-family: 'Chakra Petch', sans-serif; font-weight: 600;
+            color: var(--cyan); letter-spacing: 0.12em; text-transform: uppercase;
+            font-size: 0.85rem; margin: 0;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .section-title::before {
+            content: ""; width: 10px; height: 10px; border-radius: 2px;
+            background: var(--cyan); box-shadow: 0 0 10px var(--cyan);
+        }
+        h6 { letter-spacing: 0.05em; }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-dark mb-4">
     <div class="container d-flex justify-content-between">
-        <a class="navbar-brand" href="/"><img src="/logo.png" class="nav-logo">MINE_OS v2.7</a>
-        <button class="btn btn-purple-mc btn-mc px-3" onclick="location.reload()" id="btn-refresh">🔄 YANGILASH</button>
+        <a class="navbar-brand" href="/"><img src="/logo.png" class="nav-logo"><span class="brand-dot">//</span>MINE_OS <span style="color:var(--muted);font-weight:400;">v2.7</span></a>
+        <div class="d-flex align-items-center gap-3">
+            <span class="sys-chip d-none d-md-inline-flex">SYS ONLINE</span>
+            <button class="btn btn-primary-mc btn-mc px-3" onclick="location.reload()" id="btn-refresh">🔄 YANGILASH</button>
+        </div>
     </div>
 </nav>
 
@@ -85,7 +279,7 @@
                         {% endif %}
                         <span class="badge bg-dark border border-secondary mb-2">{{ item.time_str }}</span>
                         <h6 style="color: var(--neon-g);">{{ item.channel }}</h6>
-                        <div style="font-size: 0.65rem; color: #fff; max-height: 90px; overflow: hidden;">{{ item.text|striptags|truncate(220) }}</div>
+                        <div style="font-size: 0.65rem; color: var(--text); max-height: 90px; overflow: hidden;">{{ item.text|striptags|truncate(220) }}</div>
                         <div class="mt-3 d-flex gap-2">
                             <button class="btn btn-sm btn-primary-mc btn-mc btn-execute" onclick="publishNow({{ item.id }})">EXECUTE</button>
                             <button class="btn btn-sm btn-purple-mc btn-mc btn-edit" onclick="editPost({{ item.id }})">EDIT</button>
@@ -105,9 +299,9 @@
 
         <div class="tab-pane fade" id="published-history">
             <div class="card p-4">
-                <h6 class="mb-4" style="color: var(--neon-g);" id="history-report-head">PUBLISHED_HISTORY_REPORT</h6>
+                <h6 class="mb-4 section-title" id="history-report-head">PUBLISHED_HISTORY_REPORT</h6>
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover" style="font-size: 0.65rem;">
+                    <table class="table table-hover" style="font-size: 0.68rem;">
                         <thead>
                             <tr>
                                 <th class="lbl-preview">CONTENT_PREVIEW</th>
@@ -123,14 +317,14 @@
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         {% if p.photos %}
-                                        <img src="/file/{{ p.photos[0] }}" style="width: 60px; height: 40px; object-fit: cover; border: 1px solid #333;" onerror="this.style.display='none'">
+                                        <img src="/file/{{ p.photos[0] }}" style="width: 60px; height: 40px; object-fit: cover; border: 1px solid var(--line-strong); border-radius: 6px;" onerror="this.style.display='none'">
                                         {% endif %}
-                                        <span class="text-truncate" style="max-width: 220px; color: #fff;">{{ p.text|striptags }}</span>
+                                        <span class="text-truncate" style="max-width: 220px; color: var(--text);">{{ p.text|striptags }}</span>
                                     </div>
                                 </td>
                                 <td class="text-success">{{ p.time_str }}</td>
                                 <td><span class="badge bg-secondary">{{ p.channel }}</span></td>
-                                <td style="color: #fff;"><code>#{{ p.message_id }}</code></td>
+                                <td style="color: var(--text);"><code>#{{ p.message_id }}</code></td>
                                 <td>
                                     <button class="btn btn-sm btn-mc btn-primary-mc py-0 btn-view" onclick="viewFullText({{ p.id }})">VIEW</button>
                                 </td>
@@ -147,10 +341,10 @@
                 <div class="col-md-8">
                     <div class="card p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 style="color: var(--neon-g);" id="head-memory">AI_MEMORY_NOTES</h6>
+                            <h6 class="section-title" id="head-memory">AI_MEMORY_NOTES</h6>
                             <button class="btn btn-danger-mc btn-mc px-3" onclick="clearMemory()" id="btn-mem-clear">CLEAR</button>
                         </div>
-                        <p style="font-size: 0.6rem; color: #888;" id="memory-hint">Xotira yozuvlari har doim AI kontekstiga qo'shiladi (post yaratish, tarjima, javoblar).</p>
+                        <p style="font-size: 0.62rem; color: var(--muted);" id="memory-hint">Xotira yozuvlari har doim AI kontekstiga qo'shiladi (post yaratish, tarjima, javoblar).</p>
                         <div class="input-group mb-3">
                             <input type="text" id="memory-new" class="form-control" placeholder="Qo'shish..." onkeydown="if(event.key==='Enter')addMemory()">
                             <button class="btn btn-primary-mc btn-mc px-3" onclick="addMemory()" id="btn-mem-add">ADD</button>
@@ -160,8 +354,8 @@
                 </div>
                 <div class="col-md-4">
                     <div class="card p-4">
-                        <h6 style="color: var(--neon-g);">INFO</h6>
-                        <p style="font-size: 0.65rem; color: #fff; white-space: pre-wrap; line-height: 1.6;">Память ИИ — ручные заметки админа. Они автоматически подставляются в промпт при:
+                        <h6 class="section-title">INFO</h6>
+                        <p style="font-size: 0.66rem; color: var(--text); white-space: pre-wrap; line-height: 1.7;">Память ИИ — ручные заметки админа. Они автоматически подставляются в промпт при:
 • генерации поста
 • переводе/рерайте
 • ответе на комментарии
@@ -178,16 +372,16 @@
                 <div class="col-md-8">
                     <div class="card p-4">
                         <div class="d-flex justify-content-between mb-4">
-                            <h6 id="head-voice" style="color: var(--neon-g);">AUDIENCE_VOICE_FEED</h6>
+                            <h6 class="section-title" id="head-voice">AUDIENCE_VOICE_FEED</h6>
                             <button class="btn btn-primary-mc btn-mc px-3" onclick="analyzeComments()" id="btn-ai-analyze">🧠 ANALYZE_WITH_AI</button>
                         </div>
-                        <div id="ai-summary-container" class="ai-summary mb-4" style="display:none; color: #fff;"></div>
+                        <div id="ai-summary-container" class="ai-summary mb-4" style="display:none; color: var(--text);"></div>
                         <div id="comments-list" style="max-height: 500px; overflow-y: auto;"></div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card p-4 text-center">
-                        <h6 id="actions-head" style="color: var(--neon-g);">ACTIONS</h6>
+                        <h6 class="section-title" id="actions-head">ACTIONS</h6>
                         <button class="btn btn-danger-mc btn-mc w-100 mt-3" onclick="clearComments()" id="btn-clear-com">CLEAR_HISTORY</button>
                     </div>
                 </div>
@@ -200,20 +394,20 @@
                     <div class="row">
                         {% for ch in channels %}
                         <div class="col-md-6 mb-3">
-                            <div class="card p-3" style="border-color: var(--neon-g); cursor: pointer;" onclick="toggleChannel('{{ ch.username }}')">
+                            <div class="card p-3" style="border-color: rgba(62,240,207,0.35); cursor: pointer;" onclick="toggleChannel('{{ ch.username }}')">
                                 <div class="text-center mb-2">
-                                    <span style="color: var(--neon-g); font-size: 0.8rem;">{{ ch.username }}</span>
+                                    <span style="color: var(--neon-g); font-size: 0.8rem; letter-spacing: 0.06em;">{{ ch.username }}</span>
                                 </div>
                                 <div class="row text-center">
                                     <div class="col-6 mb-2">
-                                        <div style="font-size: 1.2rem; color: #fff;">{{ ch.subs }}</div>
-                                        <div style="font-size: 0.5rem; color: #fff;" class="lbl-total">TOTAL</div>
+                                        <div style="font-size: 1.2rem; color: var(--text); font-family: 'Chakra Petch', sans-serif;">{{ ch.subs }}</div>
+                                        <div style="font-size: 0.5rem; color: var(--muted);" class="lbl-total">TOTAL</div>
                                     </div>
                                     <div class="col-6 mb-2">
-                                        <div style="font-size: 1.2rem; color: {% if ch.g24h >= 0 %}#39ff14{% else %}#ff0033{% endif %};">
+                                        <div style="font-size: 1.2rem; font-family: 'Chakra Petch', sans-serif; color: {% if ch.g24h >= 0 %}var(--neon-g){% else %}var(--bad){% endif %};">
                                             {% if ch.g24h >= 0 %}+{% endif %}{{ ch.g24h }}
                                         </div>
-                                        <div style="font-size: 0.5rem; color: #fff;" class="lbl-24h">24H</div>
+                                        <div style="font-size: 0.5rem; color: var(--muted);" class="lbl-24h">24H</div>
                                     </div>
                                 </div>
                             </div>
@@ -221,33 +415,33 @@
                         {% endfor %}
                     </div>
                     <div class="card p-4 mt-2">
-                        <h6 id="head-growth" style="color: var(--neon-g);">GROWTH_CURVE.DATA</h6>
+                        <h6 class="section-title" id="head-growth">GROWTH_CURVE.DATA</h6>
                         <canvas id="subsChart" height="150"></canvas>
                     </div>
                     <div class="card p-4 mt-2">
-                        <h6 style="color: var(--neon-g);">PUBLISHED_PER_DAY</h6>
+                        <h6 class="section-title">PUBLISHED_PER_DAY</h6>
                         <div class="row g-2 mb-3">
-                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">TOTAL</div><div class="fw-bold text-white">{{ post_stats.total }}</div></div></div>
-                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">TODAY</div><div class="fw-bold" style="color: var(--neon-g);">+{{ post_stats.today }}</div></div></div>
-                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">WEEK</div><div class="fw-bold text-info">{{ post_stats.week }}</div></div></div>
-                            <div class="col-3"><div class="p-2 rounded bg-dark border border-secondary text-center"><div class="stats-label">MONTH</div><div class="fw-bold text-warning">{{ post_stats.month }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-transparent border border-secondary text-center"><div class="stats-label">TOTAL</div><div class="fw-bold text-white">{{ post_stats.total }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-transparent border border-secondary text-center"><div class="stats-label">TODAY</div><div class="fw-bold" style="color: var(--neon-g);">+{{ post_stats.today }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-transparent border border-secondary text-center"><div class="stats-label">WEEK</div><div class="fw-bold text-info">{{ post_stats.week }}</div></div></div>
+                            <div class="col-3"><div class="p-2 rounded bg-transparent border border-secondary text-center"><div class="stats-label">MONTH</div><div class="fw-bold text-warning">{{ post_stats.month }}</div></div></div>
                         </div>
                         <canvas id="postsChart" height="120"></canvas>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card p-3">
-                        <h6 id="head-link" style="color: var(--neon-g);">LINK_NEW_CHANNEL</h6>
+                        <h6 class="section-title" id="head-link">LINK_NEW_CHANNEL</h6>
                         <div class="input-group mb-3">
                             <input type="text" id="new-ch" class="form-control" placeholder="@user">
                             <button class="btn btn-primary-mc btn-mc px-3 btn-link-sys" onclick="addChannel()">LINK</button>
                         </div>
                     </div>
                     <div class="card p-3">
-                        <h6 id="head-linked" style="color: var(--neon-g);">LINKED_SYSTEMS</h6>
+                        <h6 class="section-title" id="head-linked">LINKED_SYSTEMS</h6>
                         <ul class="list-group list-group-flush">
                             {% for ch in channels %}
-                            <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between px-0 align-items-center" style="font-size: 0.7rem;">
+                            <li class="list-group-item text-white d-flex justify-content-between px-0 align-items-center" style="font-size: 0.7rem;">
                                 {{ ch.username }}
                                 <button class="btn btn-sm btn-danger-mc btn-mc px-2 btn-unlink" onclick="removeChannel('{{ ch.username }}')">UNLINK</button>
                             </li>
@@ -262,7 +456,7 @@
             <div class="row">
                 <div class="col-md-6 mb-4">
                     <div class="card p-4 h-100">
-                        <h6 id="head-lang" style="color: var(--neon-g);">AI_OUTPUT_LANGUAGE</h6>
+                        <h6 class="section-title" id="head-lang">AI_OUTPUT_LANGUAGE</h6>
                         <div class="d-flex gap-2 mt-3">
                             {% for l in [('uz','UZB'),('ru','RUS'),('en','ENG')] %}
                             <button class="lang-btn {% if current_lang == l[0] %}active{% endif %}" onclick="setLang('{{ l[0] }}')">{{ l[1] }}</button>
@@ -272,7 +466,7 @@
                 </div>
                 <div class="col-md-6 mb-4">
                     <div class="card p-4 h-100">
-                        <h6 style="color: var(--neon-g);" id="sq-config-head">SMART_QUEUE_CONFIG</h6>
+                        <h6 class="section-title" id="sq-config-head">SMART_QUEUE_CONFIG</h6>
                         <label class="stats-label d-block mt-3" id="interval-h-label">INTERVAL (HOURS)</label>
                         <input type="number" id="sq-interval" class="form-control mb-3" value="{{ sq_interval }}">
                         <label class="stats-label d-block" id="append-text-label">APPEND_TEXT</label>
@@ -282,11 +476,11 @@
                 </div>
                 <div class="col-md-12 mb-4">
                     <div class="card p-4">
-                        <h6 style="color: var(--neon-g);">WATERMARK_MANAGER (MAX 5)</h6>
+                        <h6 class="section-title">WATERMARK_MANAGER (MAX 5)</h6>
                         <div class="row mt-3" id="wm-container">
                             {% for wm in watermarks %}
                             <div class="col-md-2 mb-3 text-center">
-                                <div style="border: 1px solid {% if wm[3] %}var(--neon-g){% else %}#333{% endif %}; padding: 5px; background: #000;">
+                                <div style="border: 1px solid {% if wm[3] %}var(--neon-g){% else %}var(--line-strong){% endif %}; padding: 5px; background: rgba(6,9,13,0.6); border-radius: 8px;">
                                     <img src="/file/{{ wm[1] }}" style="width: 100%; height: 60px; object-fit: contain;">
                                 </div>
                                 <div class="mt-2 d-flex gap-1 justify-content-center">
@@ -296,9 +490,9 @@
                             </div>
                             {% endfor %}
                             <div class="col-md-2 mb-3">
-                                <label class="w-100 h-100 d-flex align-items-center justify-content-center" style="border: 2px dashed #444; cursor: pointer; min-height: 100px;">
+                                <label class="w-100 h-100 d-flex align-items-center justify-content-center" style="border: 2px dashed var(--line-strong); cursor: pointer; min-height: 100px; border-radius: 8px;">
                                     <input type="file" id="wm-file" hidden onchange="uploadWM()">
-                                    <span style="font-size: 1.5rem; color: #fff;">+</span>
+                                    <span style="font-size: 1.5rem; color: var(--cyan); text-shadow: 0 0 10px rgba(34,211,238,0.5);">+</span>
                                 </label>
                             </div>
                         </div>
@@ -313,12 +507,12 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header border-secondary">
-                <h6 id="head-update" style="color: var(--neon-g);">UPDATE_PAYLOAD</h6>
+                <h6 class="section-title" id="head-update">UPDATE_PAYLOAD</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <textarea id="edit-text" class="form-control mb-3" rows="12"></textarea>
-                <label style="font-size: 0.5rem; color: #fff;" id="lbl-sched">SCHED_TIME</label>
+                <label style="font-size: 0.6rem; color: var(--muted);" id="lbl-sched">SCHED_TIME</label>
                 <input type="datetime-local" id="edit-time" class="form-control" step="1">
             </div>
             <div class="modal-footer border-secondary">
@@ -327,7 +521,7 @@
         </div>
     </div>
 </div>
-<div class="modal fade" id="textModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header border-secondary"><h6 id="head-view" style="color: var(--neon-g);">RAW_DATA_VIEW</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body" id="full-text-content" style="font-size: 0.75rem; white-space: pre-wrap; color: #fff !important;"></div></div></div></div>
+<div class="modal fade" id="textModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header border-secondary"><h6 class="section-title" id="head-view">RAW_DATA_VIEW</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body" id="full-text-content" style="font-size: 0.75rem; white-space: pre-wrap; color: var(--text) !important;"></div></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -486,7 +680,7 @@
         const datasets = Object.keys(data).map((ch, index) => ({
             label: ch,
             data: data[ch].data,
-            borderColor: ['#39ff14', '#bc13fe', '#ff0033', '#388e3c', '#00d4ff'][index % 5],
+            borderColor: ['#22d3ee', '#a78bfa', '#fb5e6e', '#3ef0cf', '#fbbf24'][index % 5],
             backgroundColor: 'transparent',
             tension: 0.3,
             pointBackgroundColor: '#fff'
@@ -497,10 +691,10 @@
             type: 'line', 
             data: { labels: labels, datasets: datasets }, 
             options: { 
-                plugins: { legend: { labels: { color: '#fff', font: { family: 'Minecraftia', size: 10 } } } }, 
+                plugins: { legend: { labels: { color: '#dbe4ee', font: { family: 'IBM Plex Mono', size: 10 } } } }, 
                 scales: { 
-                    y: { grid: { color: '#222' }, ticks: { color: '#fff' } }, 
-                    x: { grid: { color: '#222' }, ticks: { color: '#fff' } } 
+                    y: { grid: { color: 'rgba(148,163,184,0.10)' }, ticks: { color: '#7e8ca0' } }, 
+                    x: { grid: { color: 'rgba(148,163,184,0.10)' }, ticks: { color: '#7e8ca0' } } 
                 } 
             } 
         });
@@ -516,8 +710,8 @@
         if (!ctx2) return;
         const bars = new Chart(ctx2.getContext('2d'), {
             type: 'bar',
-            data: { labels: p.labels, datasets: [{ label: 'Posts', data: p.data, backgroundColor: '#39ff14', borderRadius: 2 }] },
-            options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#222' }, ticks: { color: '#fff', stepSize: 1 } }, x: { grid: { color: '#222' }, ticks: { color: '#fff' } } } }
+            data: { labels: p.labels, datasets: [{ label: 'Posts', data: p.data, backgroundColor: 'rgba(34,211,238,0.75)', borderRadius: 4 }] },
+            options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(148,163,184,0.10)' }, ticks: { color: '#7e8ca0', stepSize: 1 } }, x: { grid: { color: 'rgba(148,163,184,0.10)' }, ticks: { color: '#7e8ca0' } } } }
         });
         window.postsChartInstance = bars;
     });

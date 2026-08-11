@@ -4,58 +4,213 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MINE_BOT_OS | PLATFORM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link href="https://fonts.cdnfonts.com/css/minecraftia" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #0a0a0a; --card: #141414; --mc: #388e3c; --neon-p: #bc13fe; --neon-g: #39ff14; --white: #fff; }
-        body { background: var(--bg); color: var(--white); font-family: 'Minecraftia', sans-serif; letter-spacing: 1px; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: var(--mc); }
-        .navbar { background: #000 !important; border-bottom: 3px solid var(--neon-p); box-shadow: 0 0 20px rgba(188, 19, 254, 0.3); }
-        .navbar-brand { color: var(--neon-g) !important; text-shadow: 0 0 5px var(--neon-g); font-size: 1.2rem; }
-        .nav-logo { height: 35px; margin-right: 12px; image-rendering: pixelated; }
-        .card { background: var(--card); border: 2px solid #2a2a2a; border-radius: 0; transition: all 0.3s ease; margin-bottom: 20px; }
-        .card:hover { border-color: var(--neon-p); box-shadow: 0 0 15px rgba(188, 19, 254, 0.2); transform: translateY(-3px); }
-        .btn-mc { border-radius: 0; text-transform: uppercase; font-size: 0.65rem; border-width: 2px; }
-        .btn-primary-mc { border-color: var(--neon-g); color: var(--neon-g); background: transparent; }
-        .btn-primary-mc:hover { background: var(--neon-g); color: #000; }
-        .btn-purple-mc { border-color: var(--neon-p); color: var(--neon-p); background: transparent; }
-        .btn-purple-mc:hover { background: var(--neon-p); color: #fff; }
-        .btn-danger-mc { border-color: #ff0033; color: #ff0033; background: transparent; }
-        .nav-tabs .nav-link { color: #888; border: none; font-size: 0.7rem; }
-        .nav-tabs .nav-link.active { background: transparent; color: var(--neon-p); border-bottom: 3px solid var(--neon-p); }
-        .form-control { background: #111 !important; color: #fff !important; border-radius: 0; border: 1px solid #444; font-family: monospace; }
-        .form-control:focus { background: #1a1a1a !important; color: #fff !important; border-color: var(--neon-p); box-shadow: 0 0 10px rgba(188, 19, 254, 0.5); outline: none; }
-        .form-select { background-color: #111 !important; color: #fff !important; border-radius: 0; border: 1px solid #444; }
-        .modal-content { background: #000; border: 3px solid var(--neon-p); border-radius: 0; }
-        .stat-num { font-size: 1.5rem; font-weight: bold; color: var(--neon-g); text-shadow: 0 0 10px var(--neon-g); }
-        .stat-label { font-size: 0.55rem; color: #ccc; }
-        .table { font-size: 0.65rem; color: #fff; }
-        .table th { color: var(--neon-g); border-color: #333; }
-        .table td { border-color: #222; vertical-align: middle; }
-        .badge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        :root {
+            --bg0: #07090d;
+            --bg1: #0b1017;
+            --panel: rgba(19, 27, 39, 0.62);
+            --panel-solid: #111826;
+            --line: rgba(148, 163, 184, 0.14);
+            --line-strong: rgba(148, 163, 184, 0.30);
+            --text: #dbe4ee;
+            --muted: #7e8ca0;
+            --cyan: #22d3ee;
+            --cyan-soft: rgba(34, 211, 238, 0.14);
+            --neon-g: #3ef0cf;
+            --neon-p: #a78bfa;
+            --ok: #34d399;
+            --warn: #fbbf24;
+            --bad: #fb5e6e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background:
+                radial-gradient(1100px 700px at 85% -10%, rgba(34, 211, 238, 0.10), transparent 60%),
+                radial-gradient(1000px 700px at -10% 110%, rgba(167, 139, 250, 0.08), transparent 60%),
+                linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+                var(--bg0);
+            background-size: auto, auto, 44px 44px, 44px 44px, auto;
+            background-attachment: fixed;
+            color: var(--text);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 14px;
+            letter-spacing: 0.02em;
+        }
+        ::selection { background: var(--cyan-soft); color: #fff; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg1); }
+        ::-webkit-scrollbar-thumb { background: #223044; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2e4059; }
+
+        .navbar {
+            background: rgba(8, 12, 18, 0.82) !important;
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--line);
+            box-shadow: 0 1px 0 rgba(34, 211, 238, 0.15), 0 12px 30px rgba(0,0,0,0.35);
+            position: relative;
+        }
+        .navbar::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: -1px; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(34,211,238,0.55), transparent);
+        }
+        .navbar-brand {
+            color: var(--text) !important;
+            font-family: 'Chakra Petch', sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            font-size: 1.05rem;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .navbar-brand .brand-dot { color: var(--cyan); text-shadow: 0 0 12px rgba(34,211,238,0.8); }
+        .nav-logo { height: 34px; width: 34px; object-fit: contain; filter: drop-shadow(0 0 8px rgba(34,211,238,0.45)); }
+
+        .card {
+            background: linear-gradient(180deg, rgba(28, 38, 54, 0.55), rgba(14, 21, 33, 0.6));
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.30);
+            transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+            margin-bottom: 20px;
+        }
+        .card:hover {
+            border-color: rgba(34, 211, 238, 0.45);
+            box-shadow: 0 0 0 1px rgba(34,211,238,0.12), 0 14px 34px rgba(0,0,0,0.42);
+            transform: translateY(-2px);
+        }
+
+        .btn-mc {
+            border-radius: 8px; text-transform: uppercase; font-size: 0.66rem;
+            letter-spacing: 0.12em; border-width: 1px; padding: 7px 14px;
+            background: transparent; transition: all 0.2s ease; font-weight: 600;
+        }
+        .btn-primary-mc { border-color: var(--cyan); color: var(--cyan); }
+        .btn-primary-mc:hover { background: var(--cyan); color: #06121a; box-shadow: 0 0 18px rgba(34,211,238,0.5); }
+        .btn-purple-mc { border-color: var(--neon-p); color: var(--neon-p); }
+        .btn-purple-mc:hover { background: var(--neon-p); color: #0b0a16; box-shadow: 0 0 18px rgba(167,139,250,0.45); }
+        .btn-danger-mc { border-color: var(--bad); color: var(--bad); }
+        .btn-danger-mc:hover { background: var(--bad); color: #180608; box-shadow: 0 0 18px rgba(251,94,110,0.5); }
+        .btn-outline-secondary { color: var(--muted); border-color: var(--line-strong); }
+        .btn-outline-secondary:hover { background: var(--cyan-soft); color: var(--cyan); border-color: var(--cyan); }
+        .btn-mc:disabled { opacity: 0.45; pointer-events: none; }
+
+        .form-control, .form-select {
+            background: rgba(8, 12, 18, 0.7) !important; color: var(--text) !important;
+            border: 1px solid var(--line-strong); border-radius: 8px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem;
+        }
+        .form-control:focus, .form-select:focus {
+            background: rgba(10, 15, 22, 0.9) !important; color: #fff !important;
+            border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34,211,238,0.15);
+            outline: none;
+        }
+        .form-control::placeholder { color: #5a6a7d; }
+
+        .modal-content {
+            background: linear-gradient(180deg, #131b28, #0d1420);
+            border: 1px solid var(--line-strong);
+            border-radius: 14px; box-shadow: 0 0 0 1px rgba(34,211,238,0.1), 0 24px 60px rgba(0,0,0,0.6);
+        }
+        .modal-header, .modal-footer { border-color: var(--line); }
+        .modal-title { color: var(--cyan); font-family: 'Chakra Petch', sans-serif; letter-spacing: 0.1em; }
+        .btn-close { filter: invert(0.9); }
+
+        .stat-num {
+            font-size: 1.7rem; font-weight: 600; color: var(--cyan);
+            text-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
+            font-family: 'Chakra Petch', sans-serif; line-height: 1.1;
+        }
+        .stat-label { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+        .table { font-size: 0.7rem; color: var(--text); --bs-table-bg: transparent; --bs-table-color: var(--text); --bs-table-border-color: var(--line); }
+        .table th { color: var(--cyan); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; letter-spacing: 0.12em; border-color: var(--line); }
+        .table td { border-color: var(--line); vertical-align: middle; color: var(--text); }
+        .table-hover tbody tr { transition: background 0.15s ease; }
+        .table-hover tbody tr:hover { --bs-table-hover-bg: rgba(34,211,238,0.05); }
+        .table-dark { --bs-table-bg: transparent; }
+        .badge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 6px currentColor; }
         .post-preview { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sidebar { position: sticky; top: 20px; }
-        .sidebar .nav-link { color: #888; font-size: 0.7rem; padding: 8px 12px; border-left: 3px solid transparent; }
-        .sidebar .nav-link.active { color: var(--neon-g); border-left-color: var(--neon-g); background: rgba(57,255,20,0.05); }
+        .badge { font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 0.62rem; letter-spacing: 0.06em; }
+        .badge.bg-dark, .badge.bg-secondary {
+            background: rgba(148,163,184,0.10) !important;
+            border: 1px solid var(--line-strong) !important;
+            color: var(--text) !important;
+        }
+
+        .sidebar { position: sticky; top: 20px; border-radius: 12px; overflow: hidden; }
+        .sidebar::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+        }
+        .sidebar .side-head {
+            color: var(--muted); font-size: 0.6rem; letter-spacing: 0.2em;
+            text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+            margin-bottom: 6px;
+        }
+        .sidebar .nav-link {
+            color: var(--muted); font-size: 0.68rem; letter-spacing: 0.08em;
+            padding: 8px 12px; border-left: 2px solid transparent; border-radius: 6px;
+            text-transform: uppercase; transition: all 0.18s ease;
+        }
+        .sidebar .nav-link:hover { color: var(--text); background: rgba(148,163,184,0.06); }
+        .sidebar .nav-link.active {
+            color: var(--cyan); border-left-color: var(--cyan);
+            background: var(--cyan-soft); text-shadow: 0 0 10px rgba(34,211,238,0.45);
+        }
         .sidebar .nav-link i { width: 18px; }
-        label { color: #fff !important; font-size: 0.7rem; }
-        .small-text { font-size: 0.6rem; color: #aaa; }
-        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        label { color: var(--text) !important; font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; }
+        .small-text { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.04em; }
+
+        .section-title {
+            font-family: 'Chakra Petch', sans-serif; font-weight: 600;
+            color: var(--cyan); letter-spacing: 0.12em; text-transform: uppercase;
+            font-size: 0.9rem; margin: 0;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .section-title::before {
+            content: ""; width: 10px; height: 10px; border-radius: 2px;
+            background: var(--cyan); box-shadow: 0 0 10px var(--cyan);
+        }
+
+        .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #333; transition: .3s; border-radius: 4px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: .3s; border-radius: 2px; }
-        input:checked + .slider { background: var(--neon-g); }
-        input:checked + .slider:before { transform: translateX(22px); }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background: #223044; transition: .3s; border-radius: 6px;
+            border: 1px solid var(--line-strong);
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+            background: #8ea0b5; transition: .3s; border-radius: 4px;
+        }
+        input:checked + .slider { background: rgba(34,211,238,0.28); border-color: var(--cyan); box-shadow: 0 0 10px rgba(34,211,238,0.35); }
+        input:checked + .slider:before { transform: translateX(22px); background: var(--cyan); }
+
+        .cal-event {
+            border-left: 2px solid var(--ok); padding: 6px 10px; margin-bottom: 6px;
+            border-radius: 0 6px 6px 0; background: rgba(52,211,153,0.05);
+        }
+        .network-card { margin-bottom: 10px; }
+        .channel-tag {
+            display: inline-block; padding: 2px 8px; margin: 2px;
+            background: rgba(148,163,184,0.10); border: 1px solid var(--line-strong);
+            border-radius: 6px; font-size: 0.66rem; color: var(--text);
+        }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-dark mb-4">
     <div class="container d-flex justify-content-between">
-        <a class="navbar-brand" href="/"><img src="/logo.png" class="nav-logo">MINE_OS PLATFORM</a>
+        <a class="navbar-brand" href="/"><img src="/logo.png" class="nav-logo"><span class="brand-dot">//</span>MINE_OS PLATFORM</a>
         <div>
             <button class="btn btn-primary-mc btn-mc px-3 me-2" onclick="location.href='/'">DASHBOARD</button>
             <button class="btn btn-purple-mc btn-mc px-3" onclick="location.reload()">REFRESH</button>
@@ -67,7 +222,7 @@
     <div class="row">
         <div class="col-md-2">
             <div class="card p-3 sidebar">
-                <h6 style="color: var(--neon-p); font-size: 0.7rem;">PLATFORM</h6>
+                <h6 class="side-head">PLATFORM</h6>
                 <ul class="nav flex-column" id="side-nav">
                     <li class="nav-item"><a class="nav-link active" data-sec="storage" href="#"><i class="bi bi-box-seam"></i> STORAGE</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="channels" href="#"><i class="bi bi-collection"></i> CHANNELS</a></li>
@@ -88,7 +243,7 @@
                 <div class="row" id="storage-stats"></div>
                 <div class="card p-3">
                     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">CONTENT STORAGE</h5>
+                        <h5 class="section-title mb-0">CONTENT STORAGE</h5>
                         <div class="ms-auto d-flex gap-2 flex-wrap">
                             <input class="form-control form-control-sm" id="f-post-search" placeholder="SEARCH..." style="width:160px;">
                             <select class="form-select form-select-sm" id="f-post-status" style="width:130px;">
@@ -130,7 +285,7 @@
             <div id="sec-channels" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">CHANNELS</h5>
+                        <h5 class="section-title mb-0">CHANNELS</h5>
                         <div class="ms-auto d-flex gap-2">
                             <button class="btn btn-primary-mc btn-mc btn-sm" onclick="addChannelPrompt()">+ ADD CHANNEL</button>
                             <button class="btn btn-purple-mc btn-mc btn-sm" onclick="openCloneChannels()">CLONE SETTINGS</button>
@@ -154,7 +309,7 @@
             <div id="sec-networks" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">NETWORKS</h5>
+                        <h5 class="section-title mb-0">NETWORKS</h5>
                         <button class="btn btn-primary-mc btn-mc btn-sm ms-auto" onclick="openAddNetwork()">+ NEW NETWORK</button>
                     </div>
                     <div id="networks-list"></div>
@@ -165,7 +320,7 @@
             <div id="sec-templates" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">TEMPLATES</h5>
+                        <h5 class="section-title mb-0">TEMPLATES</h5>
                         <button class="btn btn-primary-mc btn-mc btn-sm ms-auto" onclick="openAddTemplate()">+ SAVE AS TEMPLATE</button>
                     </div>
                     <div id="templates-list"></div>
@@ -176,7 +331,7 @@
             <div id="sec-scheduler" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">SCHEDULER</h5>
+                        <h5 class="section-title mb-0">SCHEDULER</h5>
                         <div class="ms-auto d-flex gap-3 align-items-center">
                             <span class="small-text">TEST MODE</span>
                             <label class="switch"><input type="checkbox" id="sched-test-mode" onchange="toggleTestMode()"><span class="slider"></span></label>
@@ -200,7 +355,7 @@
             <div id="sec-publications" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">PUBLICATION HISTORY</h5>
+                        <h5 class="section-title mb-0">PUBLICATION HISTORY</h5>
                         <div class="ms-auto d-flex gap-2">
                             <select class="form-select form-select-sm" id="pub-status" style="width:140px;" onchange="loadPublications()">
                                 <option value="">ALL</option><option>SUCCESS</option><option>FAILED</option><option>RETRY</option>
@@ -230,7 +385,7 @@
             <div id="sec-analytics" style="display:none;">
                 <div class="row" id="analytics-cards"></div>
                 <div class="card p-3">
-                    <h6 style="color: var(--neon-g);">PUBLICATIONS PER DAY</h6>
+                    <h6 class="section-title mb-3">PUBLICATIONS PER DAY</h6>
                     <canvas id="pub-chart" height="120"></canvas>
                 </div>
             </div>
@@ -239,7 +394,7 @@
             <div id="sec-errors" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">ERRORS</h5>
+                        <h5 class="section-title mb-0">ERRORS</h5>
                         <div class="ms-auto d-flex gap-2">
                             <button class="btn btn-danger-mc btn-mc btn-sm" onclick="retryAll()">RETRY FAILED</button>
                         </div>
@@ -258,7 +413,7 @@
             <div id="sec-audit" style="display:none;">
                 <div class="card p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <h5 class="m-0" style="color: var(--neon-g);">AUDIT LOG</h5>
+                        <h5 class="section-title mb-0">AUDIT LOG</h5>
                         <select class="form-select form-select-sm ms-auto" id="audit-action" style="width:180px;" onchange="loadAudit()">
                             <option value="">ALL ACTIONS</option>
                         </select>
@@ -282,7 +437,7 @@
             <!-- EVENTS -->
             <div id="sec-events" style="display:none;">
                 <div class="card p-3">
-                    <h5 class="m-0 mb-3" style="color: var(--neon-g);">SYSTEM EVENTS</h5>
+                    <h5 class="section-title mb-3">SYSTEM EVENTS</h5>
                     <div class="table-responsive">
                         <table class="table table-dark table-hover">
                             <thead><tr><th>#</th><th>TYPE</th><th>MESSAGE</th><th>TIME</th></tr></thead>
@@ -297,7 +452,7 @@
 
 <!-- MODALS -->
 <div class="modal fade" id="modalPost" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">POST</h5>
+    <div class="modal-header"><h5 class="modal-title">POST</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
     <div class="modal-body">
         <input type="hidden" id="p-id">
@@ -326,7 +481,7 @@
 </div></div></div>
 
 <div class="modal fade" id="modalChannel" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">CHANNEL SETTINGS</h5>
+    <div class="modal-header"><h5 class="modal-title">CHANNEL SETTINGS</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
     <div class="modal-body" id="channel-form-body"></div>
     <div class="modal-footer">
@@ -336,7 +491,7 @@
 </div></div></div>
 
 <div class="modal fade" id="modalNetwork" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">NETWORK</h5>
+    <div class="modal-header"><h5 class="modal-title">NETWORK</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
     <div class="modal-body">
         <input type="hidden" id="n-id">
@@ -351,7 +506,7 @@
 </div></div></div>
 
 <div class="modal fade" id="modalTemplate" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title" style="color: var(--neon-p);">TEMPLATE</h5>
+    <div class="modal-header"><h5 class="modal-title">TEMPLATE</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
     <div class="modal-body">
         <input type="hidden" id="t-id">
@@ -414,7 +569,7 @@ async function loadPosts(delta=0) {
     const tbody = document.getElementById('posts-table');
     tbody.innerHTML = '';
     d.items.forEach(p => {
-        const stColor = { draft:'#888', queued:'#ffa500', available:'#39ff14', scheduled:'#bc13fe', published:'#00bfff', archived:'#555', disabled:'#555', failed:'#ff0033' }[p.status] || '#888';
+        const stColor = { draft:'#8b98a9', queued:'#fbbf24', available:'#3ef0cf', scheduled:'#a78bfa', published:'#22d3ee', archived:'#5a6878', disabled:'#5a6878', failed:'#fb5e6e' }[p.status] || '#8b98a9';
         const preview = (p.text || p.title || '').replace(/<[^>]+>/g, '');
         tbody.insertAdjacentHTML('beforeend', `
         <tr>
@@ -518,7 +673,7 @@ async function loadChannels() {
     const tbody = document.getElementById('channels-table');
     tbody.innerHTML = '';
     d.items.forEach(c => {
-        const on = c.active ? '<span style="color:var(--neon-g)">ON</span>' : '<span style="color:#ff0033">OFF</span>';
+        const on = c.active ? '<span style="color:var(--neon-g)">ON</span>' : '<span style="color:#fb5e6e">OFF</span>';
         tbody.insertAdjacentHTML('beforeend', `
         <tr>
             <td style="color:var(--neon-g)">${c.username || ''}</td>
@@ -765,7 +920,7 @@ async function loadPublications(delta=0) {
     const tbody = document.getElementById('publications-table');
     tbody.innerHTML = '';
     d.items.forEach(p => {
-        const color = p.status === 'SUCCESS' ? 'var(--neon-g)' : (p.status === 'FAILED' ? '#ff0033' : '#ffa500');
+        const color = p.status === 'SUCCESS' ? 'var(--neon-g)' : (p.status === 'FAILED' ? '#fb5e6e' : '#fbbf24');
         tbody.insertAdjacentHTML('beforeend', `
         <tr>
             <td>#${p.id}</td>
@@ -800,8 +955,8 @@ async function loadAnalytics() {
     if (pubChart) pubChart.destroy();
     pubChart = new Chart(ctx, {
         type: 'bar',
-        data: { labels, datasets: [{ label: 'Publications', data: vals, backgroundColor: 'rgba(57,255,20,0.4)', borderColor: '#39ff14', borderWidth: 1 }] },
-        options: { scales: { y: { beginAtZero: true, ticks: { color: '#888' } }, x: { ticks: { color: '#888' } } }, plugins: { legend: { labels: { color: '#fff' } } } }
+        data: { labels, datasets: [{ label: 'Publications', data: vals, backgroundColor: 'rgba(34,211,238,0.35)', borderColor: '#22d3ee', borderWidth: 1 }] },
+        options: { scales: { y: { beginAtZero: true, ticks: { color: '#7e8ca0' } }, x: { ticks: { color: '#7e8ca0' } } }, plugins: { legend: { labels: { color: '#dbe4ee' } } } }
     });
 }
 
@@ -823,7 +978,7 @@ async function loadErrors() {
             <td>#${p.id}</td>
             <td>#${p.post_id}</td>
             <td style="color:var(--neon-g)">${p.channel || ''}</td>
-            <td style="color:#ff0033">${p.status}</td>
+            <td style="color:#fb5e6e">${p.status}</td>
             <td>${p.retry_count}</td>
             <td class="post-preview" style="max-width:200px">${p.error || ''}</td>
             <td>${p.scheduled_at ? new Date(p.scheduled_at * 1000).toLocaleString() : '-'}</td>
