@@ -203,6 +203,7 @@ def start():
 def _run():
     global _ub
     try:
+        import asyncio
         from pyrogram import Client, filters
 
         kwargs = {"api_id": int(config.USERBOT_API_ID), "api_hash": config.USERBOT_API_HASH}
@@ -232,6 +233,8 @@ def _run():
                 print(f"❌ userbot: handler error: {e}")
 
         print("🚀 Userbot (Pyrogram) запущен...")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         _ub.run()  # блокирующий цикл
     except Exception as e:
         print(f"❌ userbot: ошибка запуска: {e}")
