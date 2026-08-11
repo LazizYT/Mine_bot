@@ -184,6 +184,16 @@ def init_db():
                   created_at INTEGER,
                   updated_at INTEGER)''')
 
+    # ================= USERBOT (источники контента) =================
+    # Каналы-источники (RU/EN), которые юзербот слушает для перехвата постов.
+    c.execute('''CREATE TABLE IF NOT EXISTS userbot_sources
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  username TEXT UNIQUE,
+                  enabled INTEGER DEFAULT 1,
+                  last_message_id INTEGER DEFAULT 0,
+                  created_at INTEGER,
+                  updated_at INTEGER)''')
+
     # ================= SCHEDULES & PUBLICATIONS =================
     c.execute('''CREATE TABLE IF NOT EXISTS schedules
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -725,6 +735,57 @@ def get_audit_log(limit=200, action=None):
     conn.close()
     return [{'id': r[0], 'user': r[1], 'action': r[2], 'target': r[3],
              'old_value': r[4], 'new_value': r[5], 'created_at': r[6]} for r in rows]
+
+
+# --- USERBOT источники (userbot_sources) ---
+def userbot_add_source(username, enabled=1):
+    """Добавляет канал-источник для юзербота."""
+    conn = _connect()
+    c = conn.cursor()
+    now = int(time.time())
+    c.execute("""INSERT OR IGNORE INTO userbot_sources (username, enabled, last_message_id, created_at, updated_at)
+                 VALUES (?, ?, 0, ?, ?)""", (username, 1 if enabled else 0, now, now))
+    conn.commit()
+    conn.close()
+
+def userbot_remove_source(username):
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("DELETE FROM userbot_sources WHERE username = ?", (username,))
+    conn.commit()
+    conn.close()
+
+def userbot_get_sources():
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("SELECT id, username, enabled, last_message_id, created_at FROM userbot_sources ORDER BY id ASC")
+    rows = [{'id': r[0], 'username': r[1], 'enabled': r[2], 'last_message_id': r[3], 'created_at': r[4]} for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def userbot_set_enabled(username, enabled):
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("UPDATE userbot_sources SET enabled = ?, updated_at = ? WHERE username = ?",
+              (1 if enabled else 0, int(time.time()), username))
+    conn.commit()
+    conn.close()
+
+def userbot_set_last_message(username, message_id):
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("UPDATE userbot_sources SET last_message_id = ?, updated_at = ? WHERE username = ?",
+              (message_id, int(time.time()), username))
+    conn.commit()
+    conn.close()
+
+def userbot_get_last_message(username):
+    conn = _connect()
+    c = conn.cursor()
+    c.execute("SELECT last_message_id FROM userbot_sources WHERE username = ?", (username,))
+    r = c.fetchone()
+    conn.close()
+    return r[0] if r else 0
 
 
 # --- Бэкапы БД ---

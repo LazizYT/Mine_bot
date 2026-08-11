@@ -393,6 +393,46 @@ def api_platform_audit():
                     'page': page, 'per_page': per_page, 'pages': pages})
 
 
+@platform_bp.route('/api/platform/userbot/status', methods=['GET'])
+def api_platform_userbot_status():
+    import userbot
+    return jsonify({'status': 'success', **userbot.status()})
+
+
+@platform_bp.route('/api/platform/userbot/sources', methods=['GET'])
+def api_platform_userbot_sources():
+    return jsonify({'status': 'success', 'items': database.userbot_get_sources()})
+
+
+@platform_bp.route('/api/platform/userbot/sources', methods=['POST'])
+def api_platform_userbot_sources_add():
+    data = request.json or {}
+    username = (data.get('username') or '').strip()
+    if not username:
+        return jsonify({'status': 'error', 'error': 'Username required'}), 400
+    if not username.startswith('@'):
+        username = '@' + username
+    database.userbot_add_source(username, enabled=data.get('enabled', 1))
+    database.audit_log('userbot_source_add', username)
+    return jsonify({'status': 'success'})
+
+
+@platform_bp.route('/api/platform/userbot/sources/<path:username>', methods=['DELETE'])
+def api_platform_userbot_sources_delete(username):
+    database.userbot_remove_source(username)
+    database.audit_log('userbot_source_delete', username)
+    return jsonify({'status': 'success'})
+
+
+@platform_bp.route('/api/platform/userbot/sources/<path:username>/toggle', methods=['POST'])
+def api_platform_userbot_sources_toggle(username):
+    data = request.json or {}
+    enabled = data.get('enabled', 1)
+    database.userbot_set_enabled(username, enabled)
+    database.audit_log('userbot_source_toggle', username, new_value=str(enabled))
+    return jsonify({'status': 'success'})
+
+
 @platform_bp.route('/platform')
 def platform_page():
     return render_template('platform.html')

@@ -8,6 +8,7 @@ import publisher
 import scheduler_engine
 import handlers
 import webapp
+import userbot
 from bot_instance import bot
 
 # Инициализация бота
@@ -32,6 +33,9 @@ scheduler.add_job(scheduler_engine.retry_failed, 'interval', minutes=30, args=[b
 # Ежедневный бэкап БД (хранятся в data/backups, volume переживает рестарты)
 scheduler.add_job(database.backup_db, 'cron', hour=3, minute=5)
 scheduler.start()
+
+# Юзербот (Pyrogram): перехват постов из каналов-источников
+userbot.start()
 
 # Запуск Web Dashboard в отдельном потоке
 def start_web():

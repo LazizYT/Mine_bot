@@ -8,3 +8,4 @@ Pillow
 pytz
 flask
 waitress
+Pyrogram

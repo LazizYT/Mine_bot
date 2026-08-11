@@ -1,12 +1,38 @@
+import os
 import telebot
 import config
 import database
 import time
 
+def _open_media(item):
+    """Открывает медиа для отправки: локальный файл → file object; иначе file_id/URL."""
+    if not item:
+        return None
+    item = str(item).strip()
+    if not item:
+        return None
+    if os.path.exists(item):
+        return open(item, 'rb')
+    return item
+
+def _split_media(media_str):
+    """Разбивает строку media на (фото/видео пути, документы). Документы имеют префикс doc:."""
+    photos, docs = [], []
+    for part in str(media_str or '').split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if part.startswith('doc:'):
+            docs.append(part[4:])
+        else:
+            photos.append(part)
+    return photos, docs
+
 def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_auto=False):
     """
     Основная функция публикации контента в Telegram канал.
     Проверяет права бота в канале.
+    photo_id/document_id могут быть file_id, URL или локальными путями к файлам.
     """
     try:
         # Проверка прав администратора
@@ -26,7 +52,7 @@ def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_
             if ',' in photo_id: # Если в строке несколько ID через запятую — это альбом
                 ids = photo_id.split(',')
                 # Формируем список MediaGroup. Текст (caption) прикрепляем к первому фото.
-                media = [telebot.types.InputMediaPhoto(media=pid, caption=text if i==0 and len(text)<=1024 else None, parse_mode='HTML') for i, pid in enumerate(ids)]
+                media = [telebot.types.InputMediaPhoto(media=_open_media(pid), caption=text if i==0 and len(text)<=1024 else None, parse_mode='HTML') for i, pid in enumerate(ids)]
                 messages = bot.send_media_group(channel_id, media)
                 sent_message = messages[0] # Сохраняем ID первого сообщения в группе
                 # Если текст слишком длинный для подписи к фото (>1024 симв), отправляем его отдельным сообщением
@@ -34,9 +60,9 @@ def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_
                     bot.send_message(channel_id, text, parse_mode='HTML')
             else: # Одиночное фото
                 if len(text) <= 1024:
-                    sent_message = bot.send_photo(channel_id, photo_id, caption=text, parse_mode='HTML')
+                    sent_message = bot.send_photo(channel_id, _open_media(photo_id), caption=text, parse_mode='HTML')
                 else:
-                    bot.send_photo(channel_id, photo_id)
+                    bot.send_photo(channel_id, _open_media(photo_id))
                     sent_message = bot.send_message(channel_id, text, parse_mode='HTML')
         else: # Только текст (без фото)
             sent_message = bot.send_message(channel_id, text, parse_mode='HTML')
@@ -48,7 +74,7 @@ def publish_post_data(bot, post_id, photo_id, text, document_id, channel_id, is_
                 d_id = d_id.strip()
                 if d_id:
                     try:
-                        bot.send_document(channel_id, d_id)
+                        bot.send_document(channel_id, _open_media(d_id))
                     except Exception as de:
                         print(f"⚠️ Ошибка отправки документа {d_id}: {de}")
         

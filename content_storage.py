@@ -20,7 +20,7 @@ SELECTION_ALGOS = ['random', 'weighted', 'fifo', 'lifo', 'least_used',
 
 REUSE_MODES = ['never', 'after_days', 'unlimited']
 
-POST_SOURCES = ['telegram', 'manual', 'ai', 'modrinth', 'curseforge']
+POST_SOURCES = ['telegram', 'manual', 'ai', 'modrinth', 'curseforge', 'userbot']
 
 
 # ---------------------------------------------------------------------------

@@ -27,5 +27,19 @@ PANEL_PASSWORD = os.getenv("PANEL_PASSWORD", "")
 # Обязательная авторизация панели. По умолчанию ВКЛ — панель больше не открыта миру.
 PANEL_AUTH_REQUIRED = os.getenv("PANEL_AUTH_REQUIRED", "1").lower() in ("1", "true", "yes", "on")
 
+# 🤖 USERBOT (Pyrogram) — перехват постов из каналов-источников (RU/EN)
+# и создание узбекских постов через Groq-перевод.
+# Для работы нужны API_ID/API_HASH (my.telegram.org) и сессия:
+#   - USERBOT_SESSION_STRING — строковая сессия Pyrogram (рекомендуется для Docker),
+#   - либо USERBOT_SESSION_FILE — путь к .session файлу (по умолчанию data/userbot.session).
+# Получить api_id/api_hash: https://my.telegram.org -> API development tools.
+USERBOT_ENABLED = os.getenv("USERBOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
+USERBOT_API_ID = os.getenv("USERBOT_API_ID", "")
+USERBOT_API_HASH = os.getenv("USERBOT_API_HASH", "")
+USERBOT_SESSION_STRING = os.getenv("USERBOT_SESSION_STRING", "")
+USERBOT_SESSION_FILE = os.getenv("USERBOT_SESSION_FILE", os.path.join('data', 'userbot.session'))
+# Локальная папка для скачанного медиа (должна лежать на volume в Docker)
+USERBOT_MEDIA_DIR = os.getenv("USERBOT_MEDIA_DIR", os.path.join('data', 'userbot_media'))
+
 # 🧠 НОВАЯ НАСТРОЙКА: Интервал умной очереди (в часах)
 SMART_QUEUE_INTERVAL_HOURS = 6

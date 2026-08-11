@@ -27,6 +27,7 @@ class TestPlatformAPI(unittest.TestCase):
         cur.execute("DELETE FROM networks")
         cur.execute("DELETE FROM channel_settings")
         cur.execute("DELETE FROM managed_channels")
+        cur.execute("DELETE FROM userbot_sources")
         conn.commit()
         conn.close()
         self.client = webapp.app.test_client()
@@ -176,6 +177,30 @@ class TestPlatformAPI(unittest.TestCase):
         self.assertEqual(len(r.get_json()['items']), 1)
         r = self.client.get('/api/platform/audit?action=bulk_test&page=1&per_page=10')
         self.assertEqual(r.get_json()['total'], 5)
+
+    def test_userbot_status(self):
+        r = self.client.get('/api/platform/userbot/status')
+        self.assertEqual(r.status_code, 200)
+        d = r.get_json()
+        self.assertIn('enabled', d)
+        self.assertIn('configured', d)
+
+    def test_userbot_sources_crud(self):
+        r = self.client.post('/api/platform/userbot/sources', json={'username': '@src_channel'})
+        self.assertEqual(r.status_code, 200)
+        r = self.client.get('/api/platform/userbot/sources')
+        self.assertEqual(r.status_code, 200)
+        items = r.get_json()['items']
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['username'], '@src_channel')
+        r = self.client.post('/api/platform/userbot/sources/' + '@src_channel' + '/toggle', json={'enabled': 0})
+        self.assertEqual(r.status_code, 200)
+        r = self.client.get('/api/platform/userbot/sources')
+        self.assertEqual(r.get_json()['items'][0]['enabled'], 0)
+        r = self.client.delete('/api/platform/userbot/sources/' + '@src_channel')
+        self.assertEqual(r.status_code, 200)
+        r = self.client.get('/api/platform/userbot/sources')
+        self.assertEqual(len(r.get_json()['items']), 0)
 
 
 if __name__ == '__main__':

@@ -230,6 +230,7 @@
                     <li class="nav-item"><a class="nav-link" data-sec="templates" href="#"><i class="bi bi-files"></i> TEMPLATES</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="scheduler" href="#"><i class="bi bi-clock-history"></i> SCHEDULER</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="publications" href="#"><i class="bi bi-send-check"></i> PUBLICATIONS</a></li>
+                    <li class="nav-item"><a class="nav-link" data-sec="userbot" href="#"><i class="bi bi-robot"></i> USERBOT</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="analytics" href="#"><i class="bi bi-graph-up"></i> ANALYTICS</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="errors" href="#"><i class="bi bi-exclamation-triangle"></i> ERRORS</a></li>
                     <li class="nav-item"><a class="nav-link" data-sec="audit" href="#"><i class="bi bi-journal-text"></i> AUDIT</a></li>
@@ -390,6 +391,28 @@
                 </div>
             </div>
 
+            <!-- USERBOT -->
+            <div id="sec-userbot" style="display:none;">
+                <div class="row" id="userbot-stats"></div>
+                <div class="card p-3 mt-2">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="section-title mb-0">USERBOT SOURCES</h5>
+                        <div class="ms-auto d-flex gap-2">
+                            <input class="form-control form-control-sm" id="ub-source-input" placeholder="@channel_username" style="width:200px;">
+                            <button class="btn btn-primary-mc btn-mc btn-sm" onclick="addUserbotSource()">+ ADD SOURCE</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr><th>CHANNEL</th><th>ENABLED</th><th>LAST MSG</th><th>ACTIONS</th></tr>
+                            </thead>
+                            <tbody id="userbot-sources-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- ERRORS -->
             <div id="sec-errors" style="display:none;">
                 <div class="card p-3">
@@ -540,6 +563,7 @@ sections.forEach(s => s.addEventListener('click', e => {
     if (s.dataset.sec === 'templates') loadTemplates();
     if (s.dataset.sec === 'scheduler') { loadTestMode(); loadCalendar(); }
     if (s.dataset.sec === 'publications') loadPublications();
+    if (s.dataset.sec === 'userbot') loadUserbot();
     if (s.dataset.sec === 'analytics') loadAnalytics();
     if (s.dataset.sec === 'errors') loadErrors();
     if (s.dataset.sec === 'audit') loadAudit();
@@ -1031,6 +1055,57 @@ async function loadEvents() {
             <td>${new Date(e.created_at * 1000).toLocaleString()}</td>
         </tr>`);
     });
+}
+
+// ---------- USERBOT ----------
+async function loadUserbot() {
+    const [st, src] = await Promise.all([
+        api('/api/platform/userbot/status'),
+        api('/api/platform/userbot/sources'),
+    ]);
+    const stats = document.getElementById('userbot-stats');
+    const conf = st.configured ? 'CONFIGURED' : 'NOT CONFIGURED';
+    const run = st.running ? 'RUNNING' : (st.enabled ? 'DISABLED (no api_id/session)' : 'ENABLED=OFF');
+    stats.innerHTML = `
+        <div class="col-md-4"><div class="card p-3"><div class="stat-label">ENABLED</div><div class="stat-value">${st.enabled ? 'YES' : 'NO'}</div></div></div>
+        <div class="col-md-4"><div class="card p-3"><div class="stat-label">CONFIGURED</div><div class="stat-value" style="color:var(--neon-g)">${conf}</div></div></div>
+        <div class="col-md-4"><div class="card p-3"><div class="stat-label">STATUS</div><div class="stat-value" style="color:var(--cyan)">${run}</div></div></div>`;
+    const tbody = document.getElementById('userbot-sources-table');
+    tbody.innerHTML = '';
+    if (!src.items.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center small-text">NO SOURCES — ADD A CHANNEL ABOVE</td></tr>';
+        return;
+    }
+    src.items.forEach(s => {
+        tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td class="post-preview">${s.username}</td>
+            <td>
+                <label class="switch"><input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleUserbotSource('${s.username}', this.checked)"><span class="slider"></span></label>
+            </td>
+            <td>${s.last_message_id || 0}</td>
+            <td><button class="btn btn-sm btn-danger-mc btn-mc" onclick="deleteUserbotSource('${s.username}')">DELETE</button></td>
+        </tr>`);
+    });
+}
+
+async function addUserbotSource() {
+    const input = document.getElementById('ub-source-input');
+    const username = input.value.trim();
+    if (!username) return;
+    const d = await api('/api/platform/userbot/sources', 'POST', { username });
+    if (d.status === 'success') { input.value = ''; loadUserbot(); }
+}
+
+async function deleteUserbotSource(username) {
+    if (!confirm(`Delete source ${username}?`)) return;
+    await api('/api/platform/userbot/sources/' + encodeURIComponent(username), 'DELETE');
+    loadUserbot();
+}
+
+async function toggleUserbotSource(username, enabled) {
+    await api('/api/platform/userbot/sources/' + encodeURIComponent(username) + '/toggle',
+        'POST', { enabled: enabled ? 1 : 0 });
 }
 
 loadPosts();
