@@ -50,5 +50,20 @@ USERBOT_STORAGE_CHANNEL = os.getenv("USERBOT_STORAGE_CHANNEL", "")
 USERBOT_STORAGE_TITLE = os.getenv("USERBOT_STORAGE_TITLE", "Laziko Content Storage")
 USERBOT_BOT_USERNAME = os.getenv("USERBOT_BOT_USERNAME", "avto_postmine_bot")
 
+# Задержка (в секундах) между пересылками постов юзерботом боту.
+# Нужна, чтобы основной бот успевал генерировать узбекские посты через Groq
+# (иначе упирается в rate limit 429 / TPM).
+USERBOT_RELAY_DELAY = float(os.getenv("USERBOT_RELAY_DELAY", "0") or 0)
+
+# Фильтр рекламы в каналах-источниках: посты, содержащие ключевые слова / паттерны
+# ниже, НЕ пересылаются боту (пропускаются как «реклама»).
+USERBOT_AD_FILTER_ENABLED = os.getenv("USERBOT_AD_FILTER_ENABLED", "1").lower() in ("1", "true", "yes", "on")
+USERBOT_AD_KEYWORDS = [w.strip().lower() for w in os.getenv(
+    "USERBOT_AD_KEYWORDS",
+    "реклама,рекламное,подпишись,подписывайся,подписки,скидка,скидки,распродажа,cashback,"
+    "кешбэк,заработок,зарабатывай,выиграй,розыгрыш,конкурс,промокод,promo,sponsored,"
+    "donate,донат,спонсор,премиум,бонус,приз,реклам"
+).split(",") if w.strip()]
+
 # 🧠 НОВАЯ НАСТРОЙКА: Интервал умной очереди (в часах)
 SMART_QUEUE_INTERVAL_HOURS = 6

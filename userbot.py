@@ -18,7 +18,9 @@
 или нет API_ID/API_HASH — клиент не создаётся и никакие ошибки не возникают.
 """
 import os
+import re
 import threading
+import time
 
 import config
 import database
@@ -35,6 +37,7 @@ _started = False
 _lock = threading.Lock()
 _album_lock = threading.Lock()
 _active_groups = set()   # media_group_id, которые сейчас обрабатываются
+_last_relay_ts = 0.0     # timestamp последней пересылки боту (для задержки)
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +78,44 @@ def status():
 # ---------------------------------------------------------------------------
 # Релей в основного бота (юзербот НЕ скачивает медиа — копирует посты в ЛС бота)
 # ---------------------------------------------------------------------------
+def _is_ad_post(text):
+    """Проверяет, похож ли пост на рекламу по ключевым словам / ссылкам.
+    Возвращает True, если пост надо ОТФИЛЬТРОВАТЬ (не пересылать боту)."""
+    raw = (text or "").lower().strip()
+    if not raw:
+        return False
+    kws = getattr(config, 'USERBOT_AD_KEYWORDS', None) or []
+    for kw in kws:
+        if kw and kw in raw:
+            return True
+    # ссылки на сторонние каналы/чаты как признак промо
+    if re.search(r't\.me/(joinchat|[+-a-zA-Z0-9_]{4,})', raw):
+        return True
+    return False
+
+
+def _relay_throttle():
+    """Задержка перед следующей пересылкой боту (USERBOT_RELAY_DELAY сек).
+    Даёт основному боту время сгенерировать узбекский пост (Groq rate limit)."""
+    delay = float(getattr(config, 'USERBOT_RELAY_DELAY', 0) or 0)
+    global _last_relay_ts
+    if delay <= 0:
+        return
+    with _lock:
+        since = time.time() - _last_relay_ts
+        if _last_relay_ts and since < delay:
+            time.sleep(delay - since)
+        _last_relay_ts = time.time()
+
+
+def _ad_throttle(text):
+    """Комбинированная проверка: фильтр рекламы + задержка. True — пересылать."""
+    if _is_ad_post(text):
+        return False
+    _relay_throttle()
+    return True
+
+
 def _bot_target():
     """Куда пересылать посты: username/chat основного бота (@avto_postmine_bot)."""
     uname = str(config.USERBOT_BOT_USERNAME or 'avto_postmine_bot').strip().lstrip('@')
@@ -152,6 +193,9 @@ def capture_message(client, message, source_username):
             pass
         elif not raw_text:
             return False
+        if not _ad_throttle(raw_text):
+            print(f"🚫 userbot: {source_username} msg {message.id} → реклама отфильтрована")
+            return False
         ok = _relay_to_bot(client, message, source_username)
         _log_relayed(source_username, message.id, ok)
         return ok
@@ -169,6 +213,11 @@ def capture_album(client, messages, source_username):
         members = [m for m in messages if m.photo or m.video]
         if not members:
             return False
+        caption = next((m.caption or "" for m in members if m.caption), "")
+        if _is_ad_post(caption):
+            print(f"🚫 userbot: {source_username} альбом → реклама отфильтрована")
+            return False
+        _relay_throttle()
         ok = _relay_group_to_bot(client, members, source_username)
         _log_relayed(source_username, members[0].id, ok)
         return ok

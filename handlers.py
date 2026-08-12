@@ -141,6 +141,55 @@ def _handle_userbot_relay(message, clean_text, source_url, media="", media_type=
         except Exception:
             pass
 
+def _is_admin(user_id):
+    """Является ли отправитель админом (владельцем бота)."""
+    return user_id in (getattr(config, 'ADMIN_IDS', None) or [])
+
+def _auto_add_to_queue(message, media="", media_type="text"):
+    """Автодобавление поста в умную очередь (для постов, отправленных админом в ЛС).
+    Любое фото/видео/альбом/текст с id админа сразу идёт в Content Storage + smart queue."""
+    try:
+        user_id = message.from_user.id
+        lang = database.get_user_setting(user_id, 'persona', 'uz')
+        raw = (message.caption or message.text or "").strip() or "Minecraft mod photo"
+        if UB_MARKER in raw:
+            raw, _ = _extract_ub_marker(raw)
+        generated = ai_generator.generate_post(raw or "Minecraft mod photo", lang)
+        if not generated:
+            generated = raw
+
+        if not media:
+            if message.photo:
+                media = message.photo[-1].file_id
+                media_type = 'photo'
+            elif message.video:
+                media = message.video.file_id
+                media_type = 'video'
+            else:
+                media_type = 'text'
+
+        channel = database.get_user_setting(user_id, 'active_channel', config.DEFAULT_CHANNEL)
+        cid = _channel_id_by_username(channel)
+        post_id, qid = scheduler_engine.add_to_storage_and_queue(
+            text=generated, media=media or "", media_type=media_type,
+            channel_id=cid, channel_username=channel,
+            scheduled_time=None, language=lang, source='telegram')
+        if post_id:
+            ub_last_post[user_id] = post_id
+            database.audit_log('auto_queue', f"post:{post_id}", new_value="admin auto-queue")
+            print(f"✅ auto-queue: пост #{post_id} от админа → умная очередь")
+            bot.send_message(message.chat.id,
+                             f"✅ Пост #{post_id} автоматически добавлен в умную очередь",
+                             reply_to_message_id=message.message_id)
+        else:
+            bot.reply_to(message, "⚠️ Не удалось создать пост (возможно дубликат).")
+    except Exception as e:
+        print(f"❌ auto-queue: {e}")
+        try:
+            bot.reply_to(message, f"❌ Ошибка: {e}")
+        except Exception:
+            pass
+
 def _attach_document_to_userbot_post(message):
     """Документ (файл мода) от юзербота — прикрепляем к последнему посту юзербота этого аккаунта."""
     try:
@@ -282,7 +331,12 @@ def register_handlers(bot_instance, user_drafts, album_cache):
                 threading.Timer(2.0, process_album, args=[message.media_group_id, message.chat.id, message.from_user.id]).start()
             album_cache[message.media_group_id].append(message)
             return
-        
+
+        # Пост от админа (не кнопка меню и не состояние) → сразу в умную очередь
+        if _is_admin(user_id):
+            _auto_add_to_queue(message)
+            return
+
         process_single_message(message)
 
     def process_single_message(message):
@@ -342,6 +396,10 @@ def register_handlers(bot_instance, user_drafts, album_cache):
         # Документ (файл мода) от юзербота: маркер в caption — прикрепляем к последнему посту
         clean_text, src_url = _extract_ub_marker(message.caption or "")
         if src_url:
+            _attach_document_to_userbot_post(message)
+            return
+        # Документ от админа — прикрепляем к последнему автопосту админа в smart queue
+        if _is_admin(user_id):
             _attach_document_to_userbot_post(message)
             return
         target_id = user_current_draft_id.get(user_id)
@@ -503,6 +561,18 @@ def register_handlers(bot_instance, user_drafts, album_cache):
             media_str = ",".join(p_ids)
             _handle_userbot_relay(msgs[0], clean_text or first_cap, src_url,
                                   media=media_str, media_type='album')
+            if media_group_id in album_cache: del album_cache[media_group_id]
+            return
+        # Альбом от админа → сразу в умную очередь (без черновика)
+        if _is_admin(user_id):
+            p_ids = []
+            for m in msgs:
+                if m.photo:
+                    p_ids.append(m.photo[-1].file_id)
+                elif m.video:
+                    p_ids.append(m.video.file_id)
+            media_str = ",".join(p_ids)
+            _auto_add_to_queue(msgs[0], media=media_str, media_type='album')
             if media_group_id in album_cache: del album_cache[media_group_id]
             return
         status = bot.send_message(chat_id, get_txt(user_id, 'album_loading'))
