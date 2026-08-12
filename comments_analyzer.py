@@ -1,23 +1,13 @@
 import config
 import database
 import ai_generator
-from groq import Groq
 
 MODEL_ID = "llama-3.3-70b-versatile"
 
-# Ленивая инициализация Groq-клиента (см. ai_generator.py — Groq() падает при пустом ключе).
-_client = None
-
-def _get_client():
-    global _client
-    if _client is None:
-        _client = Groq(api_key=config.GROQ_API_KEY)
-    return _client
-
 def analyze_comments():
-    """Собирает последние комментарии из БД и просит Groq сделать выжимку."""
-    if not config.GROQ_API_KEY:
-        return "❌ GROQ_API_KEY не задан — анализ комментариев недоступен."
+    """Собирает последние комментарии из БД и просит Groq/OpenRouter сделать выжимку."""
+    if not (config.GROQ_API_KEY or getattr(config, 'OPENROUTER_API_KEY', '')):
+        return "❌ ИИ не настроен (GROQ_API_KEY / OPENROUTER_API_KEY) — анализ комментариев недоступен."
 
     comments = database.get_all_comments()
 
@@ -57,13 +47,10 @@ def analyze_comments():
     """
 
     try:
-        completion = _get_client().chat.completions.create(
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            model=MODEL_ID,
-        )
-        return completion.choices[0].message.content.strip()
+        text = ai_generator.chat_completion([{"role": "user", "content": prompt}])
+        if not text:
+            return "❌ ИИ не смог проанализировать комментарии."
+        return text.strip()
     except Exception as e:
         print(f"Ошибка ИИ при анализе: {e}")
-        return "❌ Произошла ошибка при анализе комментариев ИИ через Groq."
+        return "❌ Произошла ошибка при анализе комментариев."

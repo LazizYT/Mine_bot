@@ -10,11 +10,89 @@ import database
 # GROQ_API_KEY не роняло весь бот на импорте (Groq() бросает GroqError при api_key=None).
 _client = None
 
+# Текущий провайдер (для статуса в панели).
+_last_provider = "none"
+
 def _get_client():
     global _client
     if _client is None:
+        if not config.GROQ_API_KEY:
+            return None
         _client = Groq(api_key=config.GROQ_API_KEY)
     return _client
+
+
+def _last_ai_provider():
+    """Последний успешно сработавший провайдер (groq/openrouter/…)."""
+    return _last_provider
+
+
+def chat_completion(messages, **kwargs):
+    """
+    ЕДИНАЯ точка вызова ИИ с автоматическим переключением провайдера:
+      1. Groq (основной), 2. OpenRouter (бесплатные модели, список из env)…
+    При 429/ошибке одного провайдера — переключается на следующий.
+    Возвращает готовый текст ответа или None, если все провайдеры недоступны.
+    """
+    global _last_provider
+
+    # --- 1) Groq ---
+    if config.GROQ_API_KEY:
+        cli = _get_client()
+        if cli is not None:
+            try:
+                res = cli.chat.completions.create(messages=messages, model=MODEL_ID, **kwargs)
+                text = res.choices[0].message.content.strip()
+                _last_provider = "groq"
+                return text
+            except Exception as e:
+                print(f"⚠️ Groq ошибка: {e}")
+                # Продолжаем на следующем провайдере.
+
+    # --- 2) OpenRouter (бесплатные модели) ---
+    if getattr(config, 'OPENROUTER_API_KEY', ''):
+        try:
+            model = kwargs.pop('model', None)
+            text = _openrouter_completion(messages, model=model, **kwargs)
+            if text is not None:
+                _last_provider = "openrouter"
+                return text
+        except Exception as e:
+            print(f"⚠️ OpenRouter ошибка: {e}")
+
+    _last_provider = "none"
+    return None
+
+
+def _openrouter_completion(messages, **kwargs):
+    """Запрос к OpenRouter: перебирает бесплатные модели по очереди.
+    Возвращает текст первого успешного ответа или None."""
+    key = config.OPENROUTER_API_KEY
+    if not key:
+        return None
+    models = list(getattr(config, 'OPENROUTER_MODELS', []) or [])
+    if kwargs.get('model'):
+        models = [kwargs['model']] + models
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+    body = {"messages": messages}
+    for k in ('temperature', 'max_tokens', 'top_p'):
+        if k in kwargs:
+            body[k] = kwargs[k]
+    for model in models:
+        try:
+            body['model'] = model
+            r = requests.post(url, json=body, headers=headers, timeout=60)
+            if r.status_code == 200:
+                data = r.json()
+                return data['choices'][0]['message']['content'].strip()
+            print(f"⚠️ OpenRouter {model}: HTTP {r.status_code} — {r.text[:200]}")
+        except Exception as e:
+            print(f"⚠️ OpenRouter {model}: {e}")
+    return None
 
 # Промпт-инструкция для ИИ. Определяет роль, стиль и структуру поста.
 PROMPT_TEMPLATE = """
@@ -73,7 +151,7 @@ Qo‘shimcha:
 - Har safar original va takrorlanmaydigan uslub yarat
 """
 
-# Используемая модель ИИ
+# Основная модель Groq (первичного провайдера).
 MODEL_ID = "llama-3.3-70b-versatile"
 
 def get_memory_context(limit=10):
@@ -179,16 +257,15 @@ def generate_post(user_input, persona="uz"):
     memory = get_memory_context()
     prompt = f"TASK: Write a Minecraft mod post strictly {target_lang}.\n\n{memory}{effective_prompt_template}\n\nDATA TO PROCESS:\n{user_input}\n{mod_metadata}\n{site_content}\n\nREMINDER: Use the VERIFIED MOD DATA if available. The entire post must be {target_lang}."
     
-    if not config.GROQ_API_KEY:
-        print("⚠️ generate_post: GROQ_API_KEY not set.")
+    if not config.GROQ_API_KEY and not getattr(config, 'OPENROUTER_API_KEY', ''):
+        print("⚠️ generate_post: no AI providers configured.")
         return None
 
     try:
-        res = _get_client().chat.completions.create(
-            messages=[{"role": "user", "content": prompt}], 
-            model=MODEL_ID
-        )
-        gen = res.choices[0].message.content.strip()
+        gen = chat_completion([{"role": "user", "content": prompt}])
+        if not gen:
+            return None
+        gen = gen.strip()
         
         # Приводим упоминание канала к актуальному хэндлу (из env CHANNELS)
         gen = gen.replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
@@ -224,7 +301,7 @@ def generate_post(user_input, persona="uz"):
 
 def translate_post(text, target_persona="uz"):
     """Переводит готовый пост на другой язык, сохраняя всю HTML разметку и эмодзи."""
-    if not config.GROQ_API_KEY:
+    if not config.GROQ_API_KEY and not getattr(config, 'OPENROUTER_API_KEY', ''):
         return None
     try:
         lang_map = {
@@ -236,18 +313,17 @@ def translate_post(text, target_persona="uz"):
         
         prompt = f"Translate this Telegram post strictly to {target_lang}. Keep all HTML tags like <b>, <blockquote>, <blockquote expandable> exactly as they are. Do not remove any emojis.\n\n{get_memory_context()}\nText to translate:\n\n{text}"
         
-        res = _get_client().chat.completions.create(
-            messages=[{"role": "user", "content": prompt}], 
-            model=MODEL_ID
-        )
-        return res.choices[0].message.content.strip().replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
+        gen = chat_completion([{"role": "user", "content": prompt}])
+        if not gen:
+            return None
+        return gen.strip().replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
     except Exception as e:
         print(f"Ошибка перевода: {e}")
         return None
 
 def generate_reply(comment_text, persona="uz"):
     """Генерирует живой, человечный ответ на комментарий пользователя."""
-    if not config.GROQ_API_KEY:
+    if not config.GROQ_API_KEY and not getattr(config, 'OPENROUTER_API_KEY', ''):
         return None
     try:
         # Инструкции для разных языков, чтобы сохранить "вайб"
@@ -271,18 +347,17 @@ def generate_reply(comment_text, persona="uz"):
         Faqat matn, xeshteglar kerak emas.
         """
 
-        res = _get_client().chat.completions.create(
-            messages=[{"role": "user", "content": prompt}], 
-            model=MODEL_ID
-        )
-        return res.choices[0].message.content.strip().replace('"', '')
+        res = chat_completion([{"role": "user", "content": prompt}], temperature=0.7)
+        if not res:
+            return None
+        return res.strip().replace('"', '')
     except Exception as e:
         print(f"Ошибка ответа на комментарий: {e}")
         return None
 
 def generate_suggestion_request(persona="uz"):
     """Генерирует пост с запросом предложений от подписчиков."""
-    if not config.GROQ_API_KEY:
+    if not config.GROQ_API_KEY and not getattr(config, 'OPENROUTER_API_KEY', ''):
         return None
     try:
         lang_map = {'uz': "O'zbek tilida", 'ru': "на русском языке", 'en': "in English"}
@@ -298,18 +373,17 @@ def generate_suggestion_request(persona="uz"):
         HTML teglaridan foydalan (<b>, <i>).
         """
 
-        res = _get_client().chat.completions.create(
-            messages=[{"role": "user", "content": prompt}], 
-            model=MODEL_ID
-        )
-        return res.choices[0].message.content.strip()
+        res = chat_completion([{"role": "user", "content": prompt}])
+        if not res:
+            return None
+        return res.strip()
     except Exception as e:
         print(f"Ошибка генерации опроса: {e}")
         return None
 
 def rewrite_post(text, style="short", persona="uz"):
     """Переписывает готовый пост в выбранном стиле (short/long/funny/pro)."""
-    if not config.GROQ_API_KEY:
+    if not config.GROQ_API_KEY and not getattr(config, 'OPENROUTER_API_KEY', ''):
         return None
     try:
         style_map = {
@@ -330,18 +404,17 @@ Keep the same hashtags structure. Do not add a signature.
 Post:
 {text}
 """
-        res = _get_client().chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=MODEL_ID
-        )
-        return res.choices[0].message.content.strip().replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
+        res = chat_completion([{"role": "user", "content": prompt}])
+        if not res:
+            return None
+        return res.strip().replace('@Lazikomods', config.DEFAULT_CHANNEL).replace('@lazikomods', config.DEFAULT_CHANNEL)
     except Exception as e:
         print(f"Ошибка рерайта: {e}")
         return None
 
 def improve_prompt(description):
     """Улучшает пользовательское описание до полноценного system-промпта для ИИ."""
-    if not config.GROQ_API_KEY:
+    if not config.GROQ_API_KEY and not getattr(config, 'OPENROUTER_API_KEY', ''):
         return description
     try:
         prompt = f"""
@@ -352,11 +425,10 @@ Do NOT add any commentary outside the prompt itself.
 
 Description: "{description}"
 """
-        res = _get_client().chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=MODEL_ID
-        )
-        return res.choices[0].message.content.strip()
+        res = chat_completion([{"role": "user", "content": prompt}])
+        if not res:
+            return description
+        return res.strip()
     except Exception as e:
         print(f"Ошибка улучшения промпта: {e}")
         return description

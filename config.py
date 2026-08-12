@@ -7,6 +7,17 @@ ADMIN_IDS = [8641832514]  # Твой ID администратора — дос�
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# OpenRouter (https://openrouter.ai) — резервный провайдер ИИ.
+# При лимите/ошибке Groq бот автоматически переключается на бесплатные модели OpenRouter.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODELS = [m.strip() for m in os.getenv(
+    "OPENROUTER_MODELS",
+    "meta-llama/llama-3.3-70b-instruct:free,"
+    "deepseek/deepseek-chat-v3-0324:free,"
+    "google/gemini-2.5-flash-exp:free,"
+    "qwen/qwen-2.5-72b-instruct:free,"
+    "mistralai/mistral-7b-instruct:free"
+).split(",") if m.strip()]
 
 
 if not TELEGRAM_TOKEN:
@@ -14,7 +25,9 @@ if not TELEGRAM_TOKEN:
 if not GROQ_API_KEY:
     print("⚠️ WARNING: GROQ_API_KEY is not set. AI functions might fail.")
 if not GEMINI_KEY:
-    print("⚠️ WARNING: GEMINI_KEY is not set.")
+    print("WARNING: GEMINI_KEY is not set.")
+if not OPENROUTER_API_KEY:
+    print("WARNING: OPENROUTER_API_KEY is not set (fallback AI unavailable).")
 
 CHANNELS_STR = os.getenv("CHANNELS", "@lazikomods")
 AVAILABLE_CHANNELS = [ch.strip() for ch in CHANNELS_STR.split(',')]
