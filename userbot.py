@@ -88,8 +88,10 @@ def _is_ad_post(text):
     for kw in kws:
         if kw and kw in raw:
             return True
-    # ссылки на сторонние каналы/чаты как признак промо
-    if re.search(r't\.me/(joinchat|[+-a-zA-Z0-9_]{4,})', raw):
+    # ссылки на сторонние каналы/чаты как признак промо:
+    # только invite-ссылки (t.me/+…, t.me/joinchat) — обычные t.me/x используются
+    # самими мод-каналами для атрибуции и не считаются рекламой.
+    if re.search(r't\.me/(joinchat/|\+)', raw):
         return True
     return False
 

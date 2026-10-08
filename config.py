@@ -12,11 +12,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODELS = [m.strip() for m in os.getenv(
     "OPENROUTER_MODELS",
-    "meta-llama/llama-3.3-70b-instruct:free,"
-    "deepseek/deepseek-chat-v3-0324:free,"
-    "google/gemini-2.5-flash-exp:free,"
-    "qwen/qwen-2.5-72b-instruct:free,"
-    "mistralai/mistral-7b-instruct:free"
+    "openai/gpt-oss-20b:free,"
+    "google/gemma-4-31b-it:free,"
+    "nvidia/nemotron-nano-9b-v2:free,"
+    "nvidia/nemotron-3-super-120b-a12b:free"
 ).split(",") if m.strip()]
 
 

@@ -90,7 +90,7 @@ def _cron_next(cron, now_dt):
 
 def compute_next_run(settings, last_run_at=None, now_ts=None):
     """
-    Вычисляет следующее время публикации для канала с учётом timezone.
+    Вычисляет следующее время публикации для канала с учёдом timezone.
     Возвращает unix-ts или None, если канал не должен публиковать.
     """
     if not settings.get('active') or not settings.get('auto_publish'):
@@ -105,6 +105,9 @@ def compute_next_run(settings, last_run_at=None, now_ts=None):
         return int(nxt.timestamp()) if nxt else None
 
     interval = _parse_interval(settings.get('interval_hours'))
+    if interval is None or interval <= 0:
+        # Если interval_hours в базе пуст/0, используем настройку из config.py
+        interval = getattr(config, 'SMART_QUEUE_INTERVAL_HOURS', 6)
     if interval is None or interval <= 0:
         return None
 
